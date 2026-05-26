@@ -1,4 +1,4 @@
-import type { Attendee } from "@/lib/types";
+import type { Attendee, AttendeeWithProfile } from "@/lib/types";
 
 const EMPTY_COMPANY = new Set(["none", "n/a", "na", "null", ""]);
 
@@ -84,9 +84,34 @@ export function hydrateAttendee(attendee: Attendee): Attendee {
   };
 }
 
+function normalizeEmbeddedAttendee(row: Record<string, unknown>): AttendeeWithProfile {
+  return {
+    id: String(row.id),
+    event_slug: String(row.event_slug ?? ""),
+    name: String(row.name),
+    first_name: (row.first_name as string | null) ?? null,
+    last_name: (row.last_name as string | null) ?? null,
+    title: (row.title as string | null) ?? null,
+    company: (row.company as string | null) ?? null,
+    email: (row.email as string | null) ?? null,
+    linkedin_url: (row.linkedin_url as string | null) ?? null,
+    linkedin_id: (row.linkedin_id as string | null) ?? null,
+    company_size: (row.company_size as string | null) ?? null,
+    industry: (row.industry as string | null) ?? null,
+    funding_stage: (row.funding_stage as string | null) ?? null,
+    city: (row.city as string | null) ?? null,
+    country: (row.country as string | null) ?? null,
+    bio_summary: (row.bio_summary as string | null) ?? null,
+    apollo_enriched_at: (row.apollo_enriched_at as string | null) ?? null,
+    raw_apollo: (row.raw_apollo as Record<string, unknown> | null) ?? null,
+    archetype: (row.archetype as string | null) ?? null,
+    attendee_profiles: row.attendee_profiles as AttendeeWithProfile["attendee_profiles"],
+  };
+}
+
 /** Slim attendee safe for client components (drops heavy raw_apollo). */
-export function attendeeForMatchRow(attendee: Attendee): Attendee {
-  const hydrated = hydrateAttendee(attendee);
+export function attendeeForMatchRow(attendee: AttendeeWithProfile): Attendee {
+  const hydrated = hydrateAttendee(attendee as Attendee);
   return {
     id: hydrated.id,
     event_slug: hydrated.event_slug,
@@ -111,10 +136,13 @@ export function attendeeForMatchRow(attendee: Attendee): Attendee {
 }
 
 export function resolveEmbeddedAttendee(
-  embedded: Attendee | Attendee[] | null | undefined
-): Attendee | null {
+  embedded: unknown
+): AttendeeWithProfile | null {
   if (!embedded) return null;
-  const row = Array.isArray(embedded) ? embedded[0] : embedded;
+  const row = (Array.isArray(embedded) ? embedded[0] : embedded) as Record<
+    string,
+    unknown
+  > | null;
   if (!row?.id || !row?.name) return null;
-  return row;
+  return normalizeEmbeddedAttendee(row);
 }

@@ -302,7 +302,7 @@ export function ConferenceBriefing({
         const data: BriefingPayload = {
           ...raw,
           themes: Array.isArray(raw.themes)
-            ? raw.themes.map((t) => ({
+            ? (raw.themes as Array<Record<string, unknown>>).map((t) => ({
                 title: String(t.title ?? t.name ?? ""),
                 description: t.description as string | undefined,
                 speaker_names:
@@ -316,7 +316,7 @@ export function ConferenceBriefing({
               }))
             : raw.themes,
           archetypes: Array.isArray(raw.archetypes)
-            ? raw.archetypes.map((a) => ({
+            ? (raw.archetypes as Array<Record<string, unknown>>).map((a) => ({
                 label: String(a.label ?? a.name ?? ""),
                 count: Number(a.count ?? 0),
                 example_names: a.example_names as string[] | undefined,

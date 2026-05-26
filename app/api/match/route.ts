@@ -76,7 +76,7 @@ type AiTieredResult = {
   attendee_id: string;
   tier: TierLabel;
   match_reason: string;
-  open_with?: string;
+  open_with?: string | null;
   tags?: string[];
 };
 
@@ -151,6 +151,8 @@ export async function POST(request: NextRequest) {
     usedFallback = true;
   }
 
+  const finalScores = scores ?? [];
+
   const attendeeById = new Map(attendeeList.map((a) => [a.id, a]));
   const validIds = new Set(attendeeList.map((a) => a.id));
   const dedupedScores = new Map<
@@ -158,7 +160,7 @@ export async function POST(request: NextRequest) {
     AiTieredResult & { _score: number }
   >();
 
-  for (const s of scores) {
+  for (const s of finalScores) {
     if (!validIds.has(s.attendee_id)) continue;
     const attendee = attendeeById.get(s.attendee_id);
     const profile = attendee ? getProfileForIntent(attendee) : null;

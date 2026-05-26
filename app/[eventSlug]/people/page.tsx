@@ -103,9 +103,7 @@ export default async function PeoplePage({
 
   const matches = (matchRows ?? [])
     .map((m) => {
-      const embedded = resolveEmbeddedAttendee(
-        m.attendee as Attendee | Attendee[] | null
-      );
+      const embedded = resolveEmbeddedAttendee(m.attendee);
       if (!embedded) return null;
       return {
         id: m.id,
@@ -130,9 +128,7 @@ export default async function PeoplePage({
 
   const savedContacts = (savedRows ?? [])
     .map((s) => {
-      const embedded = resolveEmbeddedAttendee(
-        s.attendee as Attendee | Attendee[] | null
-      );
+      const embedded = resolveEmbeddedAttendee(s.attendee);
       if (!embedded) return null;
       return {
         ...s,
