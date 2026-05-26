@@ -12,6 +12,10 @@ import {
   resolveEmbeddedAttendee,
 } from "@/lib/attendee-display";
 import {
+  attendeeForListRow,
+  slimProfileForList,
+} from "@/lib/match-list-slim";
+import {
   MATCH_ALGORITHM_COOKIE,
   MATCH_ALGORITHM_VERSION,
 } from "@/lib/match-algorithm";
@@ -19,7 +23,7 @@ import { extractAttendeeProfile } from "@/lib/match-profile";
 import type { Attendee, Match, SavedContact } from "@/lib/types";
 
 const ATTENDEE_EMBED =
-  "id, event_slug, name, first_name, last_name, title, company, email, linkedin_url, linkedin_id, bio_summary, raw_apollo";
+  "id, event_slug, name, first_name, last_name, title, company, email, linkedin_url, linkedin_id, bio_summary";
 
 const MATCH_SELECT = `id, session_id, attendee_id, score, tier, match_reason, open_with, tags, generated_at, attendee:attendees(${ATTENDEE_EMBED}, attendee_profiles(profile))`;
 
@@ -80,22 +84,27 @@ export default async function PeoplePage({
     await supabase.from("matches").delete().eq("session_id", sessionId);
   }
 
-  const { data: event } = await supabase
-    .from("events")
-    .select("name")
-    .eq("slug", dbSlug)
-    .single();
-
-  const { count: attendeeCount } = await supabase
-    .from("attendees")
-    .select("*", { count: "exact", head: true })
-    .eq("event_slug", dbSlug);
-
-  const { data: matchRows, error: matchError } = await supabase
-    .from("matches")
-    .select(MATCH_SELECT)
-    .eq("session_id", sessionId)
-    .order("score", { ascending: false });
+  const [
+    { data: event },
+    { count: attendeeCount },
+    { data: matchRows, error: matchError },
+    { data: savedRows },
+  ] = await Promise.all([
+    supabase.from("events").select("name").eq("slug", dbSlug).single(),
+    supabase
+      .from("attendees")
+      .select("*", { count: "exact", head: true })
+      .eq("event_slug", dbSlug),
+    supabase
+      .from("matches")
+      .select(MATCH_SELECT)
+      .eq("session_id", sessionId)
+      .order("score", { ascending: false }),
+    supabase
+      .from("saved_contacts")
+      .select(`*, attendee:attendees(${ATTENDEE_EMBED})`)
+      .eq("session_id", sessionId),
+  ]);
 
   if (matchError) {
     console.error("matches fetch:", matchError.message);
@@ -115,16 +124,11 @@ export default async function PeoplePage({
         open_with: (m as unknown as { open_with?: string | null }).open_with ?? null,
         tags: m.tags ?? [],
         generated_at: m.generated_at,
-        attendee: attendeeForMatchRow(embedded),
-        profile: extractAttendeeProfile(embedded),
+        attendee: attendeeForListRow(attendeeForMatchRow(embedded)),
+        profile: slimProfileForList(extractAttendeeProfile(embedded)),
       };
     })
     .filter(Boolean) as (Match & { attendee: Attendee })[];
-
-  const { data: savedRows } = await supabase
-    .from("saved_contacts")
-    .select(`*, attendee:attendees(${ATTENDEE_EMBED})`)
-    .eq("session_id", sessionId);
 
   const savedContacts = (savedRows ?? [])
     .map((s) => {
@@ -132,7 +136,7 @@ export default async function PeoplePage({
       if (!embedded) return null;
       return {
         ...s,
-        attendee: attendeeForMatchRow(embedded),
+        attendee: attendeeForListRow(attendeeForMatchRow(embedded)),
       };
     })
     .filter(Boolean) as (SavedContact & { attendee: Attendee })[];

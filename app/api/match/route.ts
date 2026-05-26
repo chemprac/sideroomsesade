@@ -18,7 +18,8 @@ import type {
   IcpType,
 } from "@/lib/types";
 
-const BATCH_SIZE = 40;
+const BATCH_SIZE = 50;
+const BATCH_CONCURRENCY = 4;
 const NARRATIVE_MAX_WORDS = 400;
 
 const FOR_ICP_FIELD: Record<IcpType, string> = {
@@ -122,7 +123,9 @@ export async function POST(request: NextRequest) {
 
   const { data: attendees } = await supabase
     .from("attendees")
-    .select("*, attendee_profiles(*)")
+    .select(
+      "id, event_slug, name, title, company, industry, funding_stage, company_size, bio_summary, attendee_profiles(profile)"
+    )
     .eq("event_slug", session.event_slug);
 
   if (!attendees?.length) {
@@ -317,21 +320,17 @@ function formatAttendeeBlock(
   ].join("\n");
 }
 
-async function scoreWithAi(
-  attendees: AttendeeWithProfile[],
+async function scoreBatch(
+  batch: AttendeeWithProfile[],
   icpType: IcpType,
-  icpContext: string | null
+  icpContext: string | null,
+  goalLabel: string
 ): Promise<AiTieredResult[]> {
-  const allScores: AiTieredResult[] = [];
-  const goalLabel = ICP_GOAL_LABELS[icpType];
+  const attendeeBlocks = batch
+    .map((a) => formatAttendeeBlock(a, icpType))
+    .join("\n");
 
-  for (let i = 0; i < attendees.length; i += BATCH_SIZE) {
-    const batch = attendees.slice(i, i + BATCH_SIZE);
-    const attendeeBlocks = batch
-      .map((a) => formatAttendeeBlock(a, icpType))
-      .join("\n");
-
-    const prompt = `User goal: ${goalLabel}
+  const prompt = `User goal: ${goalLabel}
 User's additional context: ${icpContext ?? "none"}
 
 Score the following attendees. For each one:
@@ -355,23 +354,43 @@ Return ONLY a valid JSON array, no preamble:
 Attendees:
 ${attendeeBlocks}`;
 
-    const raw = await chatJson(
-      MATCH_SCORING_SYSTEM_PROMPT,
-      prompt,
-      4096,
-      0.2
-    );
+  const raw = await chatJson(
+    MATCH_SCORING_SYSTEM_PROMPT,
+    prompt,
+    4096,
+    0.2
+  );
 
-    const batchScores = parseJson<AiTieredResult[]>(raw);
-    if (!batchScores?.length) {
-      throw new OpenRouterError("Failed to parse match batch");
-    }
-    allScores.push(
-      ...batchScores.map((s) => ({
-        ...s,
-        tags: s.tags ?? [],
-      }))
+  const batchScores = parseJson<AiTieredResult[]>(raw);
+  if (!batchScores?.length) {
+    throw new OpenRouterError("Failed to parse match batch");
+  }
+  return batchScores.map((s) => ({
+    ...s,
+    tags: s.tags ?? [],
+  }));
+}
+
+async function scoreWithAi(
+  attendees: AttendeeWithProfile[],
+  icpType: IcpType,
+  icpContext: string | null
+): Promise<AiTieredResult[]> {
+  const goalLabel = ICP_GOAL_LABELS[icpType];
+  const batches: AttendeeWithProfile[][] = [];
+  for (let i = 0; i < attendees.length; i += BATCH_SIZE) {
+    batches.push(attendees.slice(i, i + BATCH_SIZE));
+  }
+
+  const allScores: AiTieredResult[] = [];
+  for (let i = 0; i < batches.length; i += BATCH_CONCURRENCY) {
+    const chunk = batches.slice(i, i + BATCH_CONCURRENCY);
+    const chunkResults = await Promise.all(
+      chunk.map((batch) => scoreBatch(batch, icpType, icpContext, goalLabel))
     );
+    for (const batchScores of chunkResults) {
+      allScores.push(...batchScores);
+    }
   }
 
   return allScores;

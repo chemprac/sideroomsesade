@@ -287,6 +287,36 @@ export function ConferenceBriefing({
     setUserGoal(readUserGoalCookie());
   }, []);
 
+  // Start scoring in the background while the user reads the briefing.
+  useEffect(() => {
+    if (!eventSlug) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const sessionRes = await fetch("/api/session/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ eventSlug }),
+        });
+        const data = await sessionRes.json();
+        if (cancelled || !data.sessionId) return;
+
+        fetch("/api/match", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId: data.sessionId }),
+        }).catch(() => {});
+      } catch {
+        // People page will trigger matching if this fails
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [eventSlug]);
+
   useEffect(() => {
     let cancelled = false;
     const load = async () => {

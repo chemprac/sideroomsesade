@@ -70,11 +70,13 @@ export function IcpSelector({ eventSlug, onComplete }: IcpSelectorProps) {
     });
     const { sessionId } = await sessionRes.json();
 
-    await fetch("/api/match", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId, force: true }),
-    }).catch(() => {});
+    if (sessionId) {
+      fetch("/api/match", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, force: true }),
+      }).catch(() => {});
+    }
 
     onComplete();
   };
