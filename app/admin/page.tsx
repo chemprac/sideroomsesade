@@ -1,97 +1,93 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { AdminShell } from "@/components/admin/AdminShell";
+import { ADMIN_AUTH_KEY } from "@/lib/admin-client";
 
 export default function AdminPage() {
+  const [authenticated, setAuthenticated] = useState(false);
+  const [password, setPassword] = useState("");
   const [secret, setSecret] = useState("");
-  const [status, setStatus] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
 
-  const runEnrich = async () => {
-    setLoading(true);
-    setStatus(null);
-    const res = await fetch("/api/admin/enrich", {
+  useEffect(() => {
+    const stored = sessionStorage.getItem(ADMIN_AUTH_KEY);
+    if (stored) {
+      setSecret(stored);
+      setAuthenticated(true);
+    }
+  }, []);
+
+  const handleLogin = async () => {
+    setAuthError(null);
+    const res = await fetch("/api/admin/auth", {
       method: "POST",
-      headers: { "x-admin-secret": secret },
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ secret: password }),
     });
-    const data = await res.json();
-    setLoading(false);
     if (!res.ok) {
-      setStatus(data.error ?? "Failed");
+      setAuthError("Invalid password");
       return;
     }
-    setStatus(`Enriched ${data.enriched}, failed ${data.failed}`);
+    sessionStorage.setItem(ADMIN_AUTH_KEY, password);
+    setSecret(password);
+    setAuthenticated(true);
+    setPassword("");
   };
 
-  const handleCsvUpload = async () => {
-    if (!csvFile) return;
-    setStatus("CSV upload is not configured — attendees are already in the database.");
+  const handleLogout = () => {
+    sessionStorage.removeItem(ADMIN_AUTH_KEY);
+    setSecret("");
+    setAuthenticated(false);
   };
 
-  return (
-    <div className="page-container" style={{ paddingTop: 32, maxWidth: 480 }}>
-      <h1 className="font-heading" style={{ fontSize: 28 }}>
-        Sideroom Admin
-      </h1>
-      <p className="muted-text" style={{ marginTop: 8, marginBottom: 24 }}>
-        Apollo enrichment and event tools. Attendee data is already loaded for
-        ESADE.
-      </p>
-
-      <label className="font-mono-label" htmlFor="admin-secret">
-        Admin secret
-      </label>
-      <input
-        id="admin-secret"
-        type="password"
-        value={secret}
-        onChange={(e) => setSecret(e.target.value)}
+  if (!authenticated) {
+    return (
+      <div
+        className="page-container"
         style={{
-          width: "100%",
-          minHeight: 48,
-          marginTop: 8,
-          marginBottom: 20,
-          border: "1.5px solid var(--border)",
-          padding: "10px 12px",
-          background: "var(--paper)",
+          paddingTop: 80,
+          maxWidth: 400,
+          margin: "0 auto",
+          minHeight: "70vh",
+          textAlign: "center",
         }}
-      />
-
-      <button
-        type="button"
-        className="btn-primary"
-        style={{ width: "100%", marginBottom: 12 }}
-        disabled={loading || !secret}
-        onClick={runEnrich}
       >
-        {loading ? "Enriching…" : "Run Apollo enrichment (batch of 50)"}
-      </button>
-
-      <div style={{ marginTop: 24, borderTop: "1px solid var(--border)", paddingTop: 24 }}>
-        <p className="font-mono-label" style={{ marginBottom: 8 }}>
-          Upload CSV
+        <span className="postmark">Restricted</span>
+        <h1 className="font-heading" style={{ fontSize: 28, marginTop: 16 }}>
+          Sideroom Admin
+        </h1>
+        <p className="muted-text" style={{ marginTop: 8, marginBottom: 24 }}>
+          Multi-conference management
         </p>
+        <label className="font-mono-label" htmlFor="admin-password">
+          Password
+        </label>
         <input
-          type="file"
-          accept=".csv"
-          onChange={(e) => setCsvFile(e.target.files?.[0] ?? null)}
-          style={{ marginBottom: 12, minHeight: 48 }}
+          id="admin-password"
+          type="password"
+          className="admin-field"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleLogin()}
         />
+        {authError && (
+          <p style={{ color: "var(--stamp-amber)", fontSize: 14, marginBottom: 12 }}>
+            {authError}
+          </p>
+        )}
         <button
           type="button"
-          className="btn-secondary"
+          className="btn-primary"
           style={{ width: "100%" }}
-          disabled={!csvFile}
-          onClick={handleCsvUpload}
+          onClick={handleLogin}
+          disabled={!password}
         >
-          Upload attendees CSV
+          Enter →
         </button>
       </div>
+    );
+  }
 
-      {status && (
-        <p style={{ marginTop: 20, fontSize: 14 }}>{status}</p>
-      )}
-    </div>
-  );
+  return <AdminShell secret={secret} onLogout={handleLogout} />;
 }

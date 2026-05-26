@@ -35,7 +35,7 @@ export function PersonCard({
   onSave,
   saved,
 }: PersonCardProps) {
-  const isFree = rank <= 3;
+  const isFree = rank <= 10;
   const showFull = paid || isFree;
 
   if (showFull) {
@@ -83,7 +83,10 @@ export function PersonCard({
           </p>
         </div>
       </div>
-      <PaywallBanner lockedCount={lockedCount} onUnlock={onUnlock} />
+      <PaywallBanner
+        totalCount={lockedCount + 10}
+        onCheckout={onUnlock}
+      />
     </article>
   );
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { SESSION_COOKIE } from "@/lib/session";
-import { resolveDbSlug } from "@/lib/events";
+import { resolveEventFromUrl } from "@/lib/events";
 
 export async function POST(request: NextRequest) {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
@@ -22,6 +22,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No session" }, { status: 401 });
   }
 
+  const event = await resolveEventFromUrl(eventSlug);
+  const priceCents = event?.price_cents ?? 800;
+  const paywallMessage =
+    event?.paywall_message ??
+    "Unlock full research for every match at this event.";
+
   const baseUrl =
     process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
 
@@ -34,10 +40,10 @@ export async function POST(request: NextRequest) {
       {
         price_data: {
           currency: "usd",
-          unit_amount: 800,
+          unit_amount: priceCents,
           product_data: {
             name: "Sideroom — Full match research",
-            description: "Unlock all AI research for this event",
+            description: paywallMessage.slice(0, 200),
           },
         },
         quantity: 1,
@@ -47,7 +53,7 @@ export async function POST(request: NextRequest) {
     cancel_url: `${baseUrl}/${eventSlug}/people`,
     metadata: {
       sideroom_session_id: sessionId,
-      event_slug: resolveDbSlug(eventSlug),
+      event_slug: event?.slug ?? eventSlug,
     },
   });
 

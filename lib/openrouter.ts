@@ -20,7 +20,8 @@ export class OpenRouterError extends Error {
 export async function chatJson(
   system: string,
   user: string,
-  maxTokens = 4096
+  maxTokens = 4096,
+  temperature = 0.4
 ): Promise<string> {
   try {
     const response = await openrouter.chat.completions.create({
@@ -29,7 +30,7 @@ export async function chatJson(
         { role: "system", content: system },
         { role: "user", content: user },
       ],
-      temperature: 0.4,
+      temperature,
       max_tokens: maxTokens,
     });
     return response.choices[0]?.message?.content ?? "";

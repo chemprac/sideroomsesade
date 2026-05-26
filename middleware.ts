@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { SESSION_COOKIE, SESSION_MAX_AGE } from "@/lib/session";
-import { resolveDbSlug } from "@/lib/events";
+import { resolveDbSlug, resolveEventFromUrl } from "@/lib/events";
 
 const EVENT_ROUTE = /^\/([^/]+)(?:\/|$)/;
 
@@ -21,10 +21,22 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  if (!pathname.endsWith("/unavailable")) {
+    const event = await resolveEventFromUrl(urlSlug);
+    if (event?.status === "draft") {
+      return NextResponse.redirect(
+        new URL(`/${urlSlug}/unavailable`, request.url)
+      );
+    }
+  }
+
   const existing = request.cookies.get(SESSION_COOKIE)?.value;
   if (existing) return NextResponse.next();
 
   const dbSlug = resolveDbSlug(urlSlug);
+  const event = await resolveEventFromUrl(urlSlug);
+  const eventSlug = event?.slug ?? dbSlug;
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -33,7 +45,7 @@ export async function middleware(request: NextRequest) {
 
   const { data: session } = await supabase
     .from("sessions")
-    .insert({ event_slug: dbSlug })
+    .insert({ event_slug: eventSlug })
     .select("id, paid, icp_type")
     .single();
 

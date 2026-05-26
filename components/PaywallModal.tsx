@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { FREE_PREVIEW_ROWS } from "@/lib/paywall";
 
 interface PaywallModalProps {
   open: boolean;
   lockedCount: number;
   sessionId: string;
+  priceDisplay?: string;
+  paywallMessage?: string | null;
   onClose: () => void;
   onCheckout: () => void;
   onRedeemSuccess: () => void;
@@ -20,6 +23,8 @@ export function PaywallModal({
   onCheckout,
   onRedeemSuccess,
   loading,
+  priceDisplay = "$8",
+  paywallMessage,
 }: PaywallModalProps) {
   const [codeExpanded, setCodeExpanded] = useState(false);
   const [code, setCode] = useState("");
@@ -68,7 +73,7 @@ export function PaywallModal({
       <div className="paywall-modal" onClick={(e) => e.stopPropagation()}>
         <div className="paywall-seal">Official · SR</div>
         <h2 className="font-heading" style={{ fontSize: 22, textAlign: "center" }}>
-          You&apos;ve seen the best 3. There are {lockedCount} more.
+          You&apos;ve seen {FREE_PREVIEW_ROWS}. There are {lockedCount} more.
         </h2>
         <ul style={{ listStyle: "none", padding: 0, margin: "20px 0" }}>
           {features.map((f) => (
@@ -77,7 +82,7 @@ export function PaywallModal({
             </li>
           ))}
         </ul>
-        <p className="price-display">$8</p>
+        <p className="price-display">{priceDisplay}</p>
 
         <div style={{ marginBottom: 20, textAlign: "center" }}>
           {!codeExpanded ? (
@@ -142,10 +147,18 @@ export function PaywallModal({
 
         <p
           className="font-mono-label"
-          style={{ textAlign: "center", marginBottom: 20, color: "var(--muted)" }}
+          style={{ textAlign: "center", marginBottom: 12, color: "var(--muted)" }}
         >
           One-time · this event only · instant access
         </p>
+        {paywallMessage && (
+          <p
+            className="muted-text"
+            style={{ textAlign: "center", marginBottom: 20, fontSize: 13 }}
+          >
+            {paywallMessage}
+          </p>
+        )}
         <button
           type="button"
           className="btn-primary"
@@ -153,7 +166,9 @@ export function PaywallModal({
           onClick={onCheckout}
           disabled={loading}
         >
-          {loading ? "Redirecting…" : `Unlock all ${lockedCount} matches — $8 →`}
+          {loading
+            ? "Redirecting…"
+            : `Unlock all ${lockedCount} matches — ${priceDisplay} →`}
         </button>
         <p
           className="ghost-text"

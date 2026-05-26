@@ -1,4 +1,15 @@
-import type { Attendee, IcpType, MatchScoreResult } from "./types";
+import {
+  detectHiringSignal,
+  detectPeerJobSeeker,
+  extractMatchContext,
+  getProfileForIntent,
+} from "@/lib/match-intent";
+import type {
+  Attendee,
+  AttendeeWithProfile,
+  IcpType,
+  MatchScoreResult,
+} from "./types";
 
 const ICP_KEYWORDS: Record<IcpType, string[]> = {
   investor: [
@@ -21,18 +32,32 @@ const ICP_KEYWORDS: Record<IcpType, string[]> = {
     "innovation",
   ],
   job: [
-    "manager",
-    "analyst",
-    "associate",
-    "consultant",
-    "mba",
-    "operations",
-    "product",
+    "hiring",
+    "head of talent",
+    "head of people",
+    "talent acquisition",
+    "recruiting",
+    "ceo",
+    "founder",
+    "chief",
   ],
 };
 
+const JOB_NEGATIVE_RE =
+  /\b(mba\s+student|mba\s+candidate|class\s+of\s+20|seeking\s+(?:a\s+)?(?:role|job|internship)|admissions|student\s+recruit)\b/i;
+
+function buildAttendeeText(
+  a: AttendeeWithProfile,
+  icpType: IcpType
+): string {
+  const profile = getProfileForIntent(a);
+  const narrativeContext = extractMatchContext(profile, icpType);
+  const base = `${a.name} ${a.title ?? ""} ${a.company ?? ""} ${a.industry ?? ""} ${a.funding_stage ?? ""} ${a.bio_summary ?? ""}`;
+  return `${base} ${narrativeContext}`.toLowerCase();
+}
+
 export function generateFallbackMatches(
-  attendees: Attendee[],
+  attendees: AttendeeWithProfile[],
   icpType: IcpType,
   icpContext: string | null
 ): MatchScoreResult[] {
@@ -44,10 +69,9 @@ export function generateFallbackMatches(
   const keywords = ICP_KEYWORDS[icpType];
 
   const scored = attendees.map((a) => {
-    const text =
-      `${a.name} ${a.title ?? ""} ${a.company ?? ""} ${a.industry ?? ""} ${a.funding_stage ?? ""} ${a.bio_summary ?? ""}`.toLowerCase();
+    const text = buildAttendeeText(a, icpType);
 
-    let score = 45 + (hashId(a.id) % 25);
+    let score = 20 + (hashId(a.id) % 20);
 
     for (const kw of keywords) {
       if (text.includes(kw)) score += 8;
@@ -61,19 +85,36 @@ export function generateFallbackMatches(
     if (icpType === "sales" && a.company_size?.includes("1000")) score += 6;
     if (icpType === "partners" && /consult|legal|platform|play/i.test(text))
       score += 8;
-    if (icpType === "job" && /growth|scale|tech|saas/i.test(text)) score += 7;
+    if (icpType === "job" && detectHiringSignal(text)) score += 15;
+    if (icpType === "job" && detectPeerJobSeeker(text)) score -= 25;
+    if (icpType === "job" && JOB_NEGATIVE_RE.test(text)) score -= 15;
 
-    score = Math.min(98, Math.max(52, score));
+    score = Math.min(98, Math.max(0, score));
 
     return {
       attendee_id: a.id,
-      score,
-      match_reason: buildMatchReason(a, icpType, icpContext),
+      tier: scoreToTier(score),
+      match_reason: buildMatchReason(a, icpType, icpContext, text),
+      open_with: null,
       tags: buildTags(a, icpType, score),
     };
   });
 
-  return scored.sort((a, b) => b.score - a.score);
+  return scored.sort((a, b) => tierToScore(b.tier) - tierToScore(a.tier));
+}
+
+function tierToScore(tier: MatchScoreResult["tier"]): number {
+  if (tier === "very_high") return 100;
+  if (tier === "high") return 75;
+  if (tier === "medium") return 50;
+  return 25;
+}
+
+function scoreToTier(score: number): MatchScoreResult["tier"] {
+  if (score >= 90) return "very_high";
+  if (score >= 70) return "high";
+  if (score >= 45) return "medium";
+  return "low";
 }
 
 function hashId(id: string): number {
@@ -85,17 +126,38 @@ function hashId(id: string): number {
 function buildMatchReason(
   a: Attendee,
   icpType: IcpType,
-  icpContext: string | null
+  icpContext: string | null,
+  text: string
 ): string {
+  const profile = getProfileForIntent(a as AttendeeWithProfile);
+  const narrative =
+    typeof profile?.narrative === "string"
+      ? profile.narrative.trim().slice(0, 120)
+      : null;
+
   const role = a.title ?? "attendee";
   const co = a.company ?? "their company";
-  const ctx = icpContext ? ` — aligns with your focus on ${icpContext.slice(0, 60)}` : "";
+  const ctx = icpContext
+    ? ` — aligns with your focus on ${icpContext.slice(0, 60)}`
+    : "";
+
+  if (icpType === "job" && detectPeerJobSeeker(text)) {
+    return narrative
+      ? `Profile indicates they are a peer job seeker or student, not a hiring manager — ${narrative}…`
+      : `${role} at ${co} — appears to be a peer or student, not someone who hires${ctx}`;
+  }
+
+  if (icpType === "job" && detectHiringSignal(text)) {
+    return narrative
+      ? `Hiring signal in profile — ${narrative}…`
+      : `${role} at ${co} — hiring signal relevant to your search${ctx}`;
+  }
 
   const reasons: Record<IcpType, string> = {
     investor: `${role} at ${co} — building something worth a conversation for angel/seed investors${ctx}`,
     sales: `${role} at ${co} — potential buyer or champion for B2B outreach${ctx}`,
     partners: `${role} at ${co} — strong fit for strategic partnership conversations${ctx}`,
-    job: `${role} at ${co} — hiring signal or operator path relevant to your search${ctx}`,
+    job: `${role} at ${co} — limited hiring signal; review narrative before reaching out${ctx}`,
   };
 
   return reasons[icpType];

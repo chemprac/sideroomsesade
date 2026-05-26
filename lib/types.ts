@@ -1,14 +1,28 @@
 export type IcpType = "investor" | "sales" | "partners" | "job";
 
+export type EventStatus = "draft" | "live";
+
 export interface Event {
   id: string;
   slug: string;
+  url_slug: string | null;
   name: string;
   location: string;
   date_start: string;
   date_end: string;
   description: string | null;
   attendee_count: number;
+  status: EventStatus;
+  price_cents: number;
+  paywall_message: string | null;
+  created_at: string;
+}
+
+export interface EventBypassCode {
+  id: string;
+  event_slug: string;
+  code: string;
+  usage_count: number;
   created_at: string;
 }
 
@@ -44,7 +58,16 @@ export interface Attendee {
   country: string | null;
   bio_summary: string | null;
   apollo_enriched_at: string | null;
+  raw_apollo?: Record<string, unknown> | null;
+  archetype: string | null;
 }
+
+export type AttendeeWithProfile = Attendee & {
+  attendee_profiles?:
+    | { profile?: Record<string, unknown> | null }
+    | { profile?: Record<string, unknown> | null }[]
+    | null;
+};
 
 export interface Session {
   id: string;
@@ -55,6 +78,7 @@ export interface Session {
   paid: boolean;
   stripe_session_id: string | null;
   stripe_payment_intent: string | null;
+  bypass_code_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -64,13 +88,16 @@ export interface Match {
   session_id: string;
   attendee_id: string;
   score: number;
+  tier: string | null;
   match_reason: string;
+  open_with: string | null;
   tags: string[];
   generated_at: string;
 }
 
 export interface MatchWithAttendee extends Match {
   attendee: Attendee;
+  profile?: Record<string, unknown> | null;
 }
 
 export interface EnrichmentSignal {
@@ -139,7 +166,8 @@ export interface CompanySignal {
 
 export interface MatchScoreResult {
   attendee_id: string;
-  score: number;
+  tier: "very_high" | "high" | "medium" | "low";
   match_reason: string;
+  open_with?: string | null;
   tags: string[];
 }

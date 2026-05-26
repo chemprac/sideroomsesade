@@ -1,4 +1,5 @@
 import { ConferenceBriefing } from "@/components/ConferenceBriefing";
+import { getUserGoalFromCookie } from "@/lib/user-goal";
 
 export default async function EventBriefingPage({
   params,
@@ -6,5 +7,6 @@ export default async function EventBriefingPage({
   params: Promise<{ eventSlug: string }>;
 }) {
   const { eventSlug } = await params;
-  return <ConferenceBriefing eventSlug={eventSlug} />;
+  const userGoal = await getUserGoalFromCookie();
+  return <ConferenceBriefing eventSlug={eventSlug} userGoal={userGoal} />;
 }

@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { SESSION_COOKIE, SESSION_MAX_AGE } from "@/lib/session";
-import { resolveDbSlug } from "@/lib/events";
+import { resolveEventFromUrl } from "@/lib/events";
 
 export async function POST(request: NextRequest) {
   const supabase = createServerClient();
   const body = await request.json().catch(() => ({}));
   const urlSlug = (body.eventSlug as string) ?? "esade";
-  const dbSlug = resolveDbSlug(urlSlug);
+  const event = await resolveEventFromUrl(urlSlug);
+  const dbSlug = event?.slug ?? urlSlug;
 
   const existingId = request.cookies.get(SESSION_COOKIE)?.value;
 
@@ -24,6 +25,13 @@ export async function POST(request: NextRequest) {
         paid: session.paid,
         icp_type: session.icp_type,
         icp_context: session.icp_context,
+        event: event
+          ? {
+              price_cents: event.price_cents,
+              paywall_message: event.paywall_message,
+              price_display: `$${event.price_cents / 100}`,
+            }
+          : null,
       });
       res.cookies.set(SESSION_COOKIE, session.id, {
         httpOnly: true,
@@ -54,6 +62,13 @@ export async function POST(request: NextRequest) {
     paid: session.paid,
     icp_type: session.icp_type,
     icp_context: session.icp_context,
+    event: event
+      ? {
+          price_cents: event.price_cents,
+          paywall_message: event.paywall_message,
+          price_display: `$${event.price_cents / 100}`,
+        }
+      : null,
   });
 
   res.cookies.set(SESSION_COOKIE, session.id, {

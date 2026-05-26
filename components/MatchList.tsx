@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Topbar } from "./Topbar";
-import { PersonCard } from "./PersonCard";
+import { MatchTable } from "./MatchTable";
 import { PaywallModal } from "./PaywallModal";
 import { HitListDrawer } from "./HitListDrawer";
+import { FREE_PREVIEW_ROWS } from "@/lib/paywall";
 import type { Attendee, MatchWithAttendee, SavedContact } from "@/lib/types";
 
-type Filter = "all" | "high" | "saved";
+type Filter = "all" | "saved";
 
 interface MatchListProps {
   eventSlug: string;
@@ -16,6 +17,7 @@ interface MatchListProps {
   initialMatches: MatchWithAttendee[];
   sessionId: string;
   paid: boolean;
+  totalAttendees: number;
   savedContacts: (SavedContact & { attendee: Attendee })[];
 }
 
@@ -25,6 +27,7 @@ export function MatchList({
   initialMatches,
   sessionId,
   paid: initialPaid,
+  totalAttendees,
   savedContacts: initialSaved,
 }: MatchListProps) {
   const router = useRouter();
@@ -35,10 +38,43 @@ export function MatchList({
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [saved, setSaved] = useState(initialSaved);
+  const [priceDisplay, setPriceDisplay] = useState("$8");
+  const [paywallMessage, setPaywallMessage] = useState<string | null>(null);
 
-  const sorted = useMemo(
-    () => [...matches].sort((a, b) => b.score - a.score),
-    [matches]
+  useEffect(() => {
+    fetch("/api/session/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventSlug }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.event?.price_display) setPriceDisplay(d.event.price_display);
+        if (d.event?.paywall_message) setPaywallMessage(d.event.paywall_message);
+      })
+      .catch(() => {});
+  }, [eventSlug]);
+
+  const sorted = useMemo(() => {
+    const byAttendee = new Map<string, MatchWithAttendee>();
+    for (const m of matches) {
+      const existing = byAttendee.get(m.attendee_id);
+      if (!existing || m.score > existing.score) {
+        byAttendee.set(m.attendee_id, m);
+      }
+    }
+    return [...byAttendee.values()].sort((a, b) => b.score - a.score);
+  }, [matches]);
+
+  const rankByAttendeeId = useMemo(() => {
+    const map = new Map<string, number>();
+    sorted.forEach((m, i) => map.set(m.attendee_id, i + 1));
+    return map;
+  }, [sorted]);
+
+  const getRank = useCallback(
+    (attendeeId: string) => rankByAttendeeId.get(attendeeId) ?? 0,
+    [rankByAttendeeId]
   );
 
   const savedIds = useMemo(
@@ -47,13 +83,12 @@ export function MatchList({
   );
 
   const filtered = useMemo(() => {
-    if (filter === "high") return sorted.filter((m) => m.score >= 90);
     if (filter === "saved")
       return sorted.filter((m) => savedIds.has(m.attendee_id));
     return sorted;
   }, [sorted, filter, savedIds]);
 
-  const lockedCount = Math.max(0, sorted.length - 3);
+  const lockedCount = Math.max(0, sorted.length - FREE_PREVIEW_ROWS);
 
   const pollPaid = useCallback(async () => {
     const res = await fetch("/api/session/create", {
@@ -88,24 +123,13 @@ export function MatchList({
     else setCheckoutLoading(false);
   };
 
-  const handleSave = async (attendeeId: string) => {
-    const res = await fetch("/api/saved-contacts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ attendeeId }),
-    });
-    if (res.ok) {
-      const contact = await res.json();
-      setSaved((prev) => {
-        if (prev.some((c) => c.attendee_id === attendeeId)) return prev;
-        return [...prev, contact];
-      });
-    }
-  };
-
   const handleStatusChange = async (contactId: string, status: string) => {
     setSaved((prev) =>
-      prev.map((c) => (c.id === contactId ? { ...c, status: status as SavedContact["status"] } : c))
+      prev.map((c) =>
+        c.id === contactId
+          ? { ...c, status: status as SavedContact["status"] }
+          : c
+      )
     );
     await fetch("/api/saved-contacts", {
       method: "PATCH",
@@ -121,58 +145,52 @@ export function MatchList({
         hitListCount={saved.length}
         onHitListClick={() => setDrawerOpen(true)}
       />
-      <div className="page-container" style={{ paddingTop: 20 }}>
-        <h1 className="font-heading" style={{ fontSize: 26 }}>
-          Your matches at {eventName}
-        </h1>
-        <p className="muted-text" style={{ marginTop: 6 }}>
-          {sorted.length} people ranked for you
-          {!paid && lockedCount > 0 && ` · Top 3 free`}
-        </p>
+      <div className="people-page">
+        <div className="people-page-header">
+          <h1 className="font-heading" style={{ fontSize: 26 }}>
+            Your matches at {eventName}
+          </h1>
+          <p className="muted-text" style={{ marginTop: 6 }}>
+            {sorted.length} people ranked for you
+            {!paid &&
+              lockedCount > 0 &&
+              ` · Showing ${FREE_PREVIEW_ROWS} of ${totalAttendees}`}
+          </p>
 
-        <div className="filter-bar">
-          {(
-            [
-              ["all", "All"],
-              ["high", "90%+ match"],
-              ["saved", "Saved"],
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              className={`filter-chip ${filter === key ? "active" : ""}`}
-              onClick={() => setFilter(key)}
-            >
-              {label}
-            </button>
-          ))}
+          <div className="filter-bar">
+            {(
+              [
+                ["all", "All"],
+                ["saved", "Saved"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                className={`filter-chip ${filter === key ? "active" : ""}`}
+                onClick={() => setFilter(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {filtered.length === 0 ? (
-          <p className="muted-text">No matches in this filter.</p>
+          <p className="muted-text" style={{ padding: "24px 16px" }}>
+            No matches in this filter.
+          </p>
         ) : (
-          filtered.map((m) => {
-            const globalRank =
-              sorted.findIndex((s) => s.attendee_id === m.attendee_id) + 1;
-            return (
-              <PersonCard
-                key={m.attendee_id}
-                attendee={m.attendee}
-                sessionId={sessionId}
-                score={m.score}
-                matchReason={m.match_reason}
-                tags={m.tags ?? []}
-                rank={globalRank}
-                paid={paid}
-                lockedCount={lockedCount}
-                onUnlock={() => setPaywallOpen(true)}
-                onSave={() => handleSave(m.attendee_id)}
-                saved={savedIds.has(m.attendee_id)}
-                eventName={eventName}
-              />
-            );
-          })
+          <MatchTable
+            rows={filtered}
+            getRank={getRank}
+            paid={paid}
+            totalCount={totalAttendees}
+            priceDisplay={priceDisplay}
+            checkoutLoading={checkoutLoading}
+            onCheckout={handleCheckout}
+            onAccessCode={() => setPaywallOpen(true)}
+          />
         )}
       </div>
 
@@ -180,6 +198,8 @@ export function MatchList({
         open={paywallOpen}
         lockedCount={lockedCount}
         sessionId={sessionId}
+        priceDisplay={priceDisplay}
+        paywallMessage={paywallMessage}
         onClose={() => setPaywallOpen(false)}
         onCheckout={handleCheckout}
         onRedeemSuccess={handleRedeemSuccess}

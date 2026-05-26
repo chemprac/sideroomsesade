@@ -34,19 +34,7 @@ export async function POST(request: NextRequest) {
     .eq("id", sessionId)
     .single();
 
-  const { data: matches } = await supabase
-    .from("matches")
-    .select("attendee_id, score")
-    .eq("session_id", sessionId)
-    .order("score", { ascending: false });
-
-  const top3Ids = new Set(
-    (matches ?? []).slice(0, 3).map((m) => m.attendee_id)
-  );
-  const isTop3 = top3Ids.has(attendeeId);
-  const allowed = session?.paid || isTop3;
-
-  if (!allowed) {
+  if (!session?.paid) {
     return NextResponse.json({ error: "Payment required" }, { status: 403 });
   }
 
