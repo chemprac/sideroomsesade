@@ -16,6 +16,12 @@ const HIRING_SIGNAL_RE =
 
 const STUDENT_STATUS_RE = /^(student|mba_student|mba_candidate)$/i;
 
+const ACTIVE_FOUNDER_RE =
+  /\b(active|current|currently|running|building|launched|launching|co[- ]?found(?:ed|er)|founder|ceo|cto|chief product officer|startup|venture|product|platform|app|company|pre[- ]?seed|seed|incubator|accelerator|traction|users|revenue|mvp|customer discovery)\b/i;
+
+const NOT_FOUNDER_TARGET_RE =
+  /\b(not (?:a |an )?(?:fundable|active|current)?\s*founder|not yet a fundable founder|not a fundable founder target|does not appear to be (?:an? )?(?:active )?founder|not currently building|pre[- ]?founder signals|worth tracking|if (?:he|she|they) launches|would be worth|no live venture|no current venture|no company yet|career (?:cmo|operator|consultant|student)|other investors?|vc analyst|vc principal|investment associate|mba student)\b/i;
+
 export function extractMatchContext(
   profile: Record<string, unknown> | null,
   icpType: IcpType
@@ -69,6 +75,11 @@ export function detectHiringSignal(text: string): boolean {
   return HIRING_SIGNAL_RE.test(text);
 }
 
+export function detectActiveFounderSignal(text: string): boolean {
+  if (!text.trim() || NOT_FOUNDER_TARGET_RE.test(text)) return false;
+  return ACTIVE_FOUNDER_RE.test(text);
+}
+
 export function getScoreCeiling(
   icpType: IcpType,
   profile: Record<string, unknown> | null,
@@ -80,6 +91,20 @@ export function getScoreCeiling(
       ? (profile.identity as Record<string, unknown>)
       : null;
   const employmentStatus = String(identity?.employment_status ?? "");
+
+  if (icpType === "investor") {
+    const founderSignals = profile?.founder_signals;
+    const hasFounderSignals =
+      Array.isArray(founderSignals) &&
+      founderSignals.some((signal) =>
+        detectActiveFounderSignal(String(signal ?? ""))
+      );
+    const currentFounderContext = detectActiveFounderSignal(context);
+
+    if (!hasFounderSignals && !currentFounderContext) return 50;
+    if (NOT_FOUNDER_TARGET_RE.test(context)) return 50;
+    return null;
+  }
 
   if (icpType !== "job") return null;
 

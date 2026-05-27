@@ -187,6 +187,20 @@ function formatAttendeeBlock(
   ].join("\n");
 }
 
+function preferredIcpMatchReason(
+  attendee: AttendeeWithProfile | undefined,
+  icpType: IcpType
+): string | null {
+  if (!attendee) return null;
+  const profile = getProfileBlob(attendee);
+  const forIcp =
+    profile?.for_icp && typeof profile.for_icp === "object"
+      ? (profile.for_icp as Record<string, unknown>)
+      : null;
+  const reason = forIcp?.[FOR_ICP_FIELD[icpType]];
+  return typeof reason === "string" && reason.trim() ? reason.trim() : null;
+}
+
 async function scoreBatch(
   batch: AttendeeWithProfile[],
   icpType: IcpType,
@@ -334,14 +348,18 @@ export async function scoreAttendeesForIcp(
     }
   }
 
-  const rows: ScoredMatchRow[] = [...dedupedScores.values()].map((s) => ({
-    attendee_id: s.attendee_id,
-    score: tierToScore(s.tier),
-    tier: s.tier,
-    match_reason: s.match_reason,
-    open_with: s.open_with ?? null,
-    tags: s.tags ?? [],
-  }));
+  const rows: ScoredMatchRow[] = [...dedupedScores.values()].map((s) => {
+    const attendee = attendeeById.get(s.attendee_id);
+    const icpReason = preferredIcpMatchReason(attendee, icpType);
+    return {
+      attendee_id: s.attendee_id,
+      score: tierToScore(s.tier),
+      tier: s.tier,
+      match_reason: icpReason ?? s.match_reason,
+      open_with: s.open_with ?? null,
+      tags: s.tags ?? [],
+    };
+  });
 
   return {
     rows,
