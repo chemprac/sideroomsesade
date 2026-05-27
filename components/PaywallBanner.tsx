@@ -12,7 +12,6 @@ interface PaywallBannerProps {
 
 export function PaywallBanner({
   totalCount,
-  priceDisplay = "$8",
   onCheckout,
   onAccessCode,
   loading,
@@ -20,8 +19,8 @@ export function PaywallBanner({
   return (
     <div className="paywall-banner paywall-banner-sticky">
       <p className="paywall-banner-text">
-        You&apos;re seeing {FREE_PREVIEW_ROWS} of {totalCount} attendees. Unlock
-        everyone for {priceDisplay}.
+        You&apos;re seeing {FREE_PREVIEW_ROWS} of {totalCount} attendees. Sign up
+        to unlock everyone.
       </p>
       <button
         type="button"
@@ -29,7 +28,7 @@ export function PaywallBanner({
         onClick={onCheckout}
         disabled={loading}
       >
-        {loading ? "Redirecting…" : `Unlock — ${priceDisplay} →`}
+        {loading ? "Opening…" : "Sign up to unlock →"}
       </button>
       {onAccessCode && (
         <button

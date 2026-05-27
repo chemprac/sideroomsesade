@@ -35,8 +35,6 @@ export function MatchList({
   const [paid, setPaid] = useState(initialPaid);
   const [filter, setFilter] = useState<Filter>("all");
   const [paywallOpen, setPaywallOpen] = useState(false);
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
-  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [saved, setSaved] = useState(initialSaved);
   const [priceDisplay, setPriceDisplay] = useState("$8");
@@ -112,32 +110,6 @@ export function MatchList({
     router.refresh();
   };
 
-  const handleCheckout = async () => {
-    setCheckoutError(null);
-    setCheckoutLoading(true);
-    try {
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, eventSlug }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (data.url) {
-        window.location.href = data.url;
-        return;
-      }
-      setCheckoutError(
-        data.error === "Stripe not configured"
-          ? "Payment is not configured yet. Please try an access code or contact the organizer."
-          : data.error ?? "Could not start checkout. Please try again."
-      );
-    } catch {
-      setCheckoutError("Could not start checkout. Please try again.");
-    } finally {
-      setCheckoutLoading(false);
-    }
-  };
-
   const handleStatusChange = async (contactId: string, status: string) => {
     setSaved((prev) =>
       prev.map((c) =>
@@ -193,19 +165,6 @@ export function MatchList({
               lockedCount > 0 &&
               ` · Showing ${FREE_PREVIEW_ROWS} of ${totalAttendees}`}
           </p>
-          {checkoutError ? (
-            <p
-              style={{
-                marginTop: 10,
-                color: "#C4842A",
-                fontSize: 13,
-                fontFamily: "var(--font-body), system-ui, sans-serif",
-              }}
-            >
-              {checkoutError}
-            </p>
-          ) : null}
-
           <div className="filter-bar">
             {(
               [
@@ -236,8 +195,8 @@ export function MatchList({
             paid={paid}
             totalCount={totalAttendees}
             priceDisplay={priceDisplay}
-            checkoutLoading={checkoutLoading}
-            onCheckout={handleCheckout}
+            checkoutLoading={false}
+            onCheckout={() => setPaywallOpen(true)}
             onAccessCode={() => setPaywallOpen(true)}
           />
         )}
@@ -247,12 +206,9 @@ export function MatchList({
         open={paywallOpen}
         lockedCount={lockedCount}
         sessionId={sessionId}
-        priceDisplay={priceDisplay}
         paywallMessage={paywallMessage}
         onClose={() => setPaywallOpen(false)}
-        onCheckout={handleCheckout}
-        onRedeemSuccess={handleRedeemSuccess}
-        loading={checkoutLoading}
+        onUnlockSuccess={handleRedeemSuccess}
       />
 
       <HitListDrawer

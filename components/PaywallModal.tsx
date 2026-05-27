@@ -1,18 +1,71 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { FREE_PREVIEW_ROWS } from "@/lib/paywall";
 
 interface PaywallModalProps {
   open: boolean;
   lockedCount: number;
   sessionId: string;
-  priceDisplay?: string;
   paywallMessage?: string | null;
   onClose: () => void;
-  onCheckout: () => void;
-  onRedeemSuccess: () => void;
-  loading?: boolean;
+  onUnlockSuccess: () => void;
+}
+
+type SignupForm = {
+  email: string;
+  name: string;
+  company: string;
+  title: string;
+  nextConference: string;
+  feedbackOptIn: boolean;
+};
+
+const initialForm: SignupForm = {
+  email: "",
+  name: "",
+  company: "",
+  title: "",
+  nextConference: "",
+  feedbackOptIn: false,
+};
+
+function Field({
+  label,
+  value,
+  onChange,
+  type = "text",
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  placeholder?: string;
+}) {
+  return (
+    <label style={{ display: "block", marginBottom: 10 }}>
+      <span className="font-mono-label" style={{ display: "block", marginBottom: 6 }}>
+        {label}
+      </span>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          width: "100%",
+          minHeight: 44,
+          border: "1.5px solid var(--border)",
+          padding: "10px 12px",
+          background: "var(--paper)",
+          color: "var(--ink)",
+          fontSize: 14,
+          boxSizing: "border-box",
+        }}
+      />
+    </label>
+  );
 }
 
 export function PaywallModal({
@@ -20,25 +73,26 @@ export function PaywallModal({
   lockedCount,
   sessionId,
   onClose,
-  onCheckout,
-  onRedeemSuccess,
-  loading,
-  priceDisplay = "$8",
+  onUnlockSuccess,
   paywallMessage,
 }: PaywallModalProps) {
   const [codeExpanded, setCodeExpanded] = useState(false);
   const [code, setCode] = useState("");
   const [redeemError, setRedeemError] = useState<string | null>(null);
   const [redeemLoading, setRedeemLoading] = useState(false);
+  const [form, setForm] = useState<SignupForm>(initialForm);
+  const [signupError, setSignupError] = useState<string | null>(null);
+  const [signupLoading, setSignupLoading] = useState(false);
 
   if (!open) return null;
 
-  const features = [
-    "Full contact details for every match",
-    "AI signals and talking points",
-    "Personalized email and LinkedIn openers",
-    "Save contacts to your hit list",
-  ];
+  const updateForm = <K extends keyof SignupForm>(
+    key: K,
+    value: SignupForm[K]
+  ) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    setSignupError(null);
+  };
 
   const handleRedeem = async () => {
     setRedeemError(null);
@@ -60,7 +114,34 @@ export function PaywallModal({
 
     setCode("");
     setCodeExpanded(false);
-    onRedeemSuccess();
+    onUnlockSuccess();
+  };
+
+  const handleSignup = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSignupError(null);
+    setSignupLoading(true);
+
+    try {
+      const res = await fetch("/api/session/unlock-signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, ...form }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || data.error) {
+        setSignupError(data.error ?? "Could not unlock access.");
+        return;
+      }
+
+      setForm(initialForm);
+      onUnlockSuccess();
+    } catch {
+      setSignupError("Could not unlock access. Please try again.");
+    } finally {
+      setSignupLoading(false);
+    }
   };
 
   return (
@@ -73,18 +154,90 @@ export function PaywallModal({
       <div className="paywall-modal" onClick={(e) => e.stopPropagation()}>
         <div className="paywall-seal">Official · SR</div>
         <h2 className="font-heading" style={{ fontSize: 22, textAlign: "center" }}>
-          You&apos;ve seen {FREE_PREVIEW_ROWS}. There are {lockedCount} more.
+          You&apos;ve seen {FREE_PREVIEW_ROWS}. Unlock {lockedCount} more.
         </h2>
-        <ul style={{ listStyle: "none", padding: 0, margin: "20px 0" }}>
-          {features.map((f) => (
-            <li key={f} style={{ marginBottom: 10, fontSize: 14 }}>
-              — {f}
-            </li>
-          ))}
-        </ul>
-        <p className="price-display">{priceDisplay}</p>
+        <p className="muted-text" style={{ textAlign: "center", marginTop: 8, fontSize: 13 }}>
+          Tell us who you are and get instant full access.
+        </p>
+        {paywallMessage && (
+          <p
+            className="muted-text"
+            style={{ textAlign: "center", marginTop: 10, marginBottom: 18, fontSize: 13 }}
+          >
+            {paywallMessage}
+          </p>
+        )}
 
-        <div style={{ marginBottom: 20, textAlign: "center" }}>
+        <form onSubmit={handleSignup} style={{ marginTop: 18 }}>
+          <Field
+            label="Email"
+            type="email"
+            value={form.email}
+            onChange={(value) => updateForm("email", value)}
+            placeholder="you@example.com"
+          />
+          <Field
+            label="Name"
+            value={form.name}
+            onChange={(value) => updateForm("name", value)}
+            placeholder="Your name"
+          />
+          <Field
+            label="Company"
+            value={form.company}
+            onChange={(value) => updateForm("company", value)}
+            placeholder="Company or school"
+          />
+          <Field
+            label="Title"
+            value={form.title}
+            onChange={(value) => updateForm("title", value)}
+            placeholder="Role / title"
+          />
+          <Field
+            label="Next conference you will go to"
+            value={form.nextConference}
+            onChange={(value) => updateForm("nextConference", value)}
+            placeholder="e.g. SaaStr, Slush, Web Summit"
+          />
+
+          <label
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 8,
+              fontSize: 13,
+              color: "var(--muted)",
+              lineHeight: 1.4,
+              margin: "6px 0 12px",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={form.feedbackOptIn}
+              onChange={(e) => updateForm("feedbackOptIn", e.target.checked)}
+              style={{ marginTop: 2 }}
+            />
+            <span>Can we email you for feedback on your experience?</span>
+          </label>
+
+          {signupError && (
+            <p style={{ color: "var(--stamp-amber)", fontSize: 13, marginBottom: 8 }}>
+              {signupError}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            className="btn-primary"
+            style={{ width: "100%" }}
+            disabled={signupLoading}
+          >
+            {signupLoading ? "Unlocking…" : "Submit and unlock →"}
+          </button>
+        </form>
+
+        <div style={{ marginTop: 16, marginBottom: 14, textAlign: "center" }}>
           {!codeExpanded ? (
             <button
               type="button"
@@ -97,8 +250,8 @@ export function PaywallModal({
                 cursor: "pointer",
                 textDecoration: "underline",
                 fontFamily: "var(--font-body)",
-                minHeight: 48,
-                padding: "8px 0",
+                minHeight: 36,
+                padding: "4px 0",
               }}
             >
               Have an access code?
@@ -119,12 +272,13 @@ export function PaywallModal({
                 autoComplete="off"
                 style={{
                   width: "100%",
-                  minHeight: 48,
+                  minHeight: 44,
                   border: "1.5px solid var(--border)",
                   padding: "10px 12px",
                   background: "var(--paper)",
                   fontSize: 14,
                   marginBottom: 8,
+                  boxSizing: "border-box",
                 }}
               />
               {redeemError && (
@@ -146,41 +300,16 @@ export function PaywallModal({
         </div>
 
         <p
-          className="font-mono-label"
-          style={{ textAlign: "center", marginBottom: 12, color: "var(--muted)" }}
-        >
-          One-time · this event only · instant access
-        </p>
-        {paywallMessage && (
-          <p
-            className="muted-text"
-            style={{ textAlign: "center", marginBottom: 20, fontSize: 13 }}
-          >
-            {paywallMessage}
-          </p>
-        )}
-        <button
-          type="button"
-          className="btn-primary"
-          style={{ width: "100%" }}
-          onClick={onCheckout}
-          disabled={loading}
-        >
-          {loading
-            ? "Redirecting…"
-            : `Unlock all ${lockedCount} matches — ${priceDisplay} →`}
-        </button>
-        <p
           className="ghost-text"
-          style={{ textAlign: "center", marginTop: 14, fontSize: 11 }}
+          style={{ textAlign: "center", marginTop: 10, fontSize: 11 }}
         >
-          Secured by Stripe · no subscription
+          Instant access · no payment required
         </p>
         <button
           type="button"
           onClick={onClose}
           style={{
-            marginTop: 16,
+            marginTop: 12,
             width: "100%",
             background: "none",
             border: "none",
@@ -189,7 +318,7 @@ export function PaywallModal({
             fontSize: 11,
             textTransform: "uppercase",
             letterSpacing: "0.08em",
-            minHeight: 48,
+            minHeight: 44,
           }}
         >
           Not now
