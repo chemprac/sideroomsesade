@@ -1,951 +1,152 @@
-"use client";
+'use client'
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { useParams, useRouter } from "next/navigation";
+import Link from 'next/link'
 
-type Weight = "high" | "med" | "low";
-type SignalType = "funding" | "hiring" | "launch" | "partnership";
-type CompanyType =
-  | "enterprise_buyer"
-  | "investor"
-  | "strategic_partner"
-  | "peer_founder";
-
-interface BriefingTheme {
-  title: string;
-  description?: string;
-  speaker_names: string[];
-  session_day: string;
-  why_it_matters: string;
-}
-
-interface BriefingArchetype {
-  label: string;
-  count: number;
-  example_names?: string[];
-  what_they_want?: string;
-}
-
-interface BriefingSignal {
-  company: string;
-  signal_text: string;
-  signal_type: SignalType;
-  attendee_name?: string;
-}
-
-interface BriefingStats {
-  total_attendees?: number;
-  unique_companies?: number;
-  countries_represented?: number;
-  vc_and_investor_count?: number;
-  founder_count?: number;
-  avg_years_experience?: number;
-}
-
-interface BriefingCompany {
-  name: string;
-  attendee_name: string;
-  attendee_title: string;
-  why_relevant: string;
-  company_type: CompanyType;
-}
-
-interface SectionWeights {
-  themes_weight?: Weight;
-  signals_weight?: Weight;
-  archetypes_weight?: Weight;
-  companies_weight?: Weight;
-}
-
-interface CustomSection {
-  label: string;
-  content: string;
-}
-
-interface DeanNote {
-  agenda_intelligence: string;
-  goal_advice: string;
-  leave_with: string;
-}
-
-interface BriefingPayload {
-  event?: { name?: string };
-  themes?: BriefingTheme[] | null;
-  archetypes?: BriefingArchetype[] | null;
-  signals?: BriefingSignal[] | null;
-  stats?: BriefingStats | null;
-  companies?: BriefingCompany[] | null;
-  section_weights?: SectionWeights | null;
-  custom_section?: CustomSection | null;
-  dean_note?: DeanNote | null;
-}
-
-const PAPER = "#F5F0E6";
-const INK = "#1C1208";
-const AMBER = "#C4842A";
-const BORDER = "#C4B89A";
-const MUTED = "#8B7D5A";
-const AGED = "#EDE5D0";
-
-const mono: CSSProperties = {
-  fontFamily: "var(--font-mono), monospace",
-};
-
-const sans: CSSProperties = {
-  fontFamily: "var(--font-body), system-ui, sans-serif",
-};
-
-function zoneLabel(): CSSProperties {
-  return {
-    ...mono,
-    fontSize: 9,
-    textTransform: "uppercase",
-    letterSpacing: "0.1em",
-    color: MUTED,
-    marginBottom: 10,
-    display: "block",
-  };
-}
-
-function readUserGoalCookie(): string | null {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith("user_goal="));
-  if (!match) return null;
-  const raw = match.slice("user_goal=".length);
-  try {
-    const decoded = decodeURIComponent(raw).trim();
-    if (!decoded) return null;
-    if (decoded.length <= 80) return decoded;
-    return `${decoded.slice(0, 80).trimEnd()}…`;
-  } catch {
-    return raw.trim() || null;
-  }
-}
-
-function hasStats(stats: BriefingStats | null | undefined): boolean {
-  if (!stats || typeof stats !== "object") return false;
-  return Object.values(stats).some((v) => v != null && v !== "");
-}
-
-function hasItems<T>(arr: T[] | null | undefined): arr is T[] {
-  return Array.isArray(arr) && arr.length > 0;
-}
-
-function isAgendaHighlight(sentence: string): boolean {
-  const s = sentence.trim();
-  if (/^Day\s/i.test(s)) return true;
-  if (/^\d{1,2}:\d{2}/.test(s)) return true;
-  if (/^["']/.test(s)) return true;
-  if (/^Build or Kill/i.test(s)) return true;
-  return false;
-}
-
-function renderAgendaParagraphs(text: string) {
-  const paragraphs = text.split(/\n\n+/).filter(Boolean);
-  return paragraphs.map((para, pi) => {
-    const sentences = para.split(/(?<=[.!?])\s+/).filter(Boolean);
-    return (
-      <div key={pi}>
-        {sentences.map((sentence, si) =>
-          isAgendaHighlight(sentence) ? (
-            <div
-              key={si}
-              style={{
-                borderLeft: `2px solid ${AMBER}`,
-                paddingLeft: 8,
-                margin: "10px 0",
-                ...sans,
-                fontSize: 10,
-                color: MUTED,
-                lineHeight: 1.5,
-              }}
-            >
-              {sentence}
-            </div>
-          ) : (
-            <p
-              key={si}
-              style={{
-                ...sans,
-                fontSize: 11,
-                lineHeight: 1.65,
-                color: INK,
-                margin: "0 0 10px",
-              }}
-            >
-              {sentence}
-            </p>
-          )
-        )}
-      </div>
-    );
-  });
-}
-
-function companyBadgeStyle(type: CompanyType): {
-  style: CSSProperties;
-  label: string;
-} {
-  const base: CSSProperties = {
-    display: "inline-block",
-    border: "1px solid",
-    borderRadius: 0,
-    ...mono,
-    fontSize: 9,
-    padding: "1px 5px",
-  };
-  switch (type) {
-    case "enterprise_buyer":
-      return {
-        style: { ...base, color: "#2A5A1A", borderColor: "#2A5A1A" },
-        label: "enterprise buyer",
-      };
-    case "investor":
-      return {
-        style: { ...base, color: AMBER, borderColor: AMBER },
-        label: "investor",
-      };
-    case "strategic_partner":
-      return {
-        style: { ...base, color: "#185FA5", borderColor: "#185FA5" },
-        label: "partner",
-      };
-    case "peer_founder":
-    default:
-      return {
-        style: { ...base, color: MUTED, borderColor: BORDER },
-        label: "peer founder",
-      };
-  }
-}
-
-function sessionDayStyle(day: string): CSSProperties {
-  const highlight = day.includes("2");
-  return {
-    border: "1px solid",
-    borderRadius: 0,
-    ...mono,
-    fontSize: 9,
-    padding: "2px 6px",
-    whiteSpace: "nowrap",
-    color: highlight ? AMBER : MUTED,
-    borderColor: highlight ? AMBER : BORDER,
-  };
-}
-
-function CentreButton({
-  children,
-  onClick,
-  fullWidth,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  fullWidth?: boolean;
-}) {
+export default function ConferenceBriefing() {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        background: INK,
-        color: PAPER,
-        border: "none",
-        borderRadius: 0,
-        padding: fullWidth ? "10px 0" : "5px 12px",
-        ...sans,
-        fontSize: fullWidth ? 12 : 11,
-        cursor: "pointer",
-        width: fullWidth ? "100%" : undefined,
-      }}
-    >
-      {children}
-    </button>
-  );
-}
+    <div style={{background:'#F5F0E6',fontFamily:"'DM Sans',sans-serif",color:'#1C1208',width:'100%',border:'1px solid #C4B89A'}}>
 
-export function ConferenceBriefing({
-  eventSlug: eventSlugProp,
-  userGoal: _userGoal,
-}: {
-  eventSlug: string;
-  userGoal?: string | null;
-}) {
-  const params = useParams();
-  const router = useRouter();
-  const eventSlug =
-    (typeof params?.eventSlug === "string" ? params.eventSlug : null) ??
-    eventSlugProp;
-
-  const [briefing, setBriefing] = useState<BriefingPayload | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const [userGoal, setUserGoal] = useState<string | null>(null);
-
-  useEffect(() => {
-    setUserGoal(readUserGoalCookie());
-  }, []);
-
-  // Start scoring in the background while the user reads the briefing.
-  useEffect(() => {
-    if (!eventSlug) return;
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const sessionRes = await fetch("/api/session/create", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ eventSlug }),
-        });
-        const data = await sessionRes.json();
-        if (cancelled || !data.sessionId) return;
-
-        fetch("/api/match", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId: data.sessionId }),
-        }).catch(() => {});
-      } catch {
-        // People page will trigger matching if this fails
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [eventSlug]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      setLoading(true);
-      setError(false);
-      try {
-        const res = await fetch(`/api/briefing/${eventSlug}`);
-        if (!res.ok) throw new Error("Failed");
-        const raw = (await res.json()) as BriefingPayload & {
-          themes?: Array<Record<string, unknown>>;
-          archetypes?: Array<Record<string, unknown>>;
-        };
-        const data: BriefingPayload = {
-          ...raw,
-          themes: Array.isArray(raw.themes)
-            ? (raw.themes as Array<Record<string, unknown>>).map((t) => ({
-                title: String(t.title ?? t.name ?? ""),
-                description: t.description as string | undefined,
-                speaker_names:
-                  (t.speaker_names as string[]) ??
-                  (t.speakers as string[]) ??
-                  [],
-                session_day: String(t.session_day ?? ""),
-                why_it_matters: String(
-                  t.why_it_matters ?? t.description ?? ""
-                ),
-              }))
-            : raw.themes,
-          archetypes: Array.isArray(raw.archetypes)
-            ? (raw.archetypes as Array<Record<string, unknown>>).map((a) => ({
-                label: String(a.label ?? a.name ?? ""),
-                count: Number(a.count ?? 0),
-                example_names: a.example_names as string[] | undefined,
-                what_they_want: a.what_they_want as string | undefined,
-              }))
-            : raw.archetypes,
-        };
-        if (!cancelled) setBriefing(data);
-      } catch {
-        if (!cancelled) setError(true);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [eventSlug]);
-
-  const goPeople = () => router.push(`/${eventSlug}/people`);
-
-  const maxArchetypeCount = useMemo(() => {
-    const counts = (briefing?.archetypes ?? []).map((a) => a.count ?? 0);
-    return counts.length ? Math.max(...counts) : 1;
-  }, [briefing?.archetypes]);
-
-  const eventName = briefing?.event?.name ?? eventSlug;
-
-  if (loading) {
-    return (
-      <div
-        style={{
-          minHeight: 400,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: PAPER,
-          ...mono,
-          fontSize: 13,
-          color: MUTED,
-        }}
-      >
-        Loading intelligence...
-      </div>
-    );
-  }
-
-  if (error || !briefing) {
-    return (
-      <div
-        style={{
-          minHeight: 400,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: PAPER,
-          ...mono,
-          fontSize: 13,
-          color: MUTED,
-        }}
-      >
-        Briefing not yet available for this event.
-      </div>
-    );
-  }
-
-  const stats = briefing.stats;
-  const showStats = hasStats(stats);
-  const showArchetypes = hasItems(briefing.archetypes);
-  const showSignals = hasItems(briefing.signals);
-  const showThemes = hasItems(briefing.themes);
-  const showCompanies = hasItems(briefing.companies);
-  const showDean = Boolean(briefing.dean_note);
-  const showCustom = Boolean(briefing.custom_section);
-  const signalCards = (briefing.signals ?? []).slice(0, 4);
-
-  const statRows: { key: keyof BriefingStats; label: string; suffix?: string }[] =
-    [
-      { key: "total_attendees", label: "Attendees" },
-      { key: "unique_companies", label: "Companies" },
-      { key: "countries_represented", label: "Countries" },
-      { key: "vc_and_investor_count", label: "Investors" },
-      { key: "founder_count", label: "Founders" },
-      { key: "avg_years_experience", label: "Avg exp.", suffix: "yr" },
-    ];
-
-  const themesBlock = showThemes ? (
-    <div className="briefing-zone-block" style={{ padding: 14 }}>
-      <span style={zoneLabel()}>WHAT&apos;S BEING TALKED ABOUT</span>
-      {(briefing.themes ?? []).map((theme, i, arr) => (
-        <div
-          key={`${theme.title}-${i}`}
-          role="button"
-          tabIndex={0}
-          onClick={goPeople}
-          onKeyDown={(e) => e.key === "Enter" && goPeople()}
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr auto",
-            gap: 8,
-            alignItems: "start",
-            padding: "10px 0",
-            borderBottom:
-              i < arr.length - 1 ? `1px solid ${BORDER}` : undefined,
-            cursor: "pointer",
-          }}
-          className="briefing-theme-row"
-        >
-          <div>
-            <div
-              className="briefing-theme-title"
-              style={{
-                ...sans,
-                fontSize: 13,
-                fontWeight: 600,
-                marginBottom: 3,
-                color: INK,
-                transition: "color 0.15s",
-              }}
-            >
-              {theme.title}
-            </div>
-            <div
-              style={{
-                ...sans,
-                fontSize: 11,
-                color: MUTED,
-                fontStyle: "italic",
-                lineHeight: 1.4,
-                marginBottom: 4,
-              }}
-            >
-              {theme.why_it_matters}
-            </div>
-            <div style={{ ...mono, fontSize: 10, color: MUTED }}>
-              {(theme.speaker_names ?? []).join(" · ")}
-            </div>
-          </div>
-          <span style={sessionDayStyle(theme.session_day ?? "")}>
-            {theme.session_day}
-          </span>
+      {/* TOP BAR */}
+      <div style={{borderBottom:'1px solid #C4B89A',padding:'10px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',background:'#EDE5D0'}}>
+        <div style={{display:'flex',flexDirection:'column',gap:2}}>
+          <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'#8B7D5A',textTransform:'uppercase',letterSpacing:'0.08em'}}>Conference Intelligence Brief</span>
+          <span style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:600,color:'#1C1208'}}>ESADE MBA Alumni Forum 2026</span>
         </div>
-      ))}
-    </div>
-  ) : null;
+        <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'#8B7D5A',textTransform:'uppercase',letterSpacing:'0.08em'}}>Barcelona · May 28–30</span>
+      </div>
 
-  const archetypesBlock = showArchetypes ? (
-    <div
-      className="briefing-zone-block"
-      style={{
-        padding: 14,
-        borderTop: showThemes ? `1px solid ${BORDER}` : undefined,
-      }}
-    >
-      <span style={zoneLabel()}>WHO&apos;S HERE</span>
-      {(briefing.archetypes ?? []).map((arch, i) => (
-        <div key={`${arch.label}-${i}`} style={{ marginBottom: 6 }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <span style={{ ...sans, fontSize: 11, color: INK }}>{arch.label}</span>
-            <span
-              style={{
-                ...mono,
-                fontSize: 13,
-                fontWeight: 600,
-                color: INK,
-              }}
-            >
-              {arch.count}
-            </span>
+      {/* STATS ROW */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',borderBottom:'1px solid #C4B89A'}}>
+        {[
+          {num:'182',label:'Attendees'},
+          {num:'26',label:'Speakers'},
+          {num:'34%',label:'Founders & CEOs'},
+          {num:'19+',label:'Countries'},
+        ].map((s,i,arr)=>(
+          <div key={i} style={{padding:'16px 18px',borderRight:i<arr.length-1?'1px solid #C4B89A':'none'}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:32,fontWeight:600,color:'#1C1208',lineHeight:1}}>{s.num}</div>
+            <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,textTransform:'uppercase',letterSpacing:'0.08em',color:'#8B7D5A',marginTop:4}}>{s.label}</div>
           </div>
-          <div
-            style={{
-              height: 2,
-              width: "100%",
-              background: BORDER,
-              marginTop: 4,
-            }}
-          >
-            <div
-              style={{
-                height: 2,
-                background: INK,
-                width: `${(arch.count / maxArchetypeCount) * 100}%`,
-              }}
-            />
+        ))}
+      </div>
+
+      {/* CHARTS ROW */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',borderBottom:'1px solid #C4B89A'}}>
+        
+        {/* Donut */}
+        <div style={{padding:'16px 18px',borderRight:'1px solid #C4B89A'}}>
+          <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,textTransform:'uppercase',letterSpacing:'0.1em',color:'#C4842A',marginBottom:10}}>Who's in the room</div>
+          <svg width="150" height="150" viewBox="0 0 150 150" style={{display:'block',margin:'0 auto 10px'}} role="img" aria-label="Attendee mix: Founders and CEOs 26%, Investors and VCs 14%, Senior Executives 22%, MBA Students 26%, Other 12%">
+            <circle cx="75" cy="75" r="48" fill="none" stroke="#C4842A" strokeWidth="18" strokeDasharray="78.4 223.2" strokeDashoffset="0" transform="rotate(-90 75 75)"/>
+            <circle cx="75" cy="75" r="48" fill="none" stroke="#1C1208" strokeWidth="18" strokeDasharray="42.2 259.4" strokeDashoffset="-78.4" transform="rotate(-90 75 75)"/>
+            <circle cx="75" cy="75" r="48" fill="none" stroke="#8B7D5A" strokeWidth="18" strokeDasharray="66.4 235.2" strokeDashoffset="-120.6" transform="rotate(-90 75 75)"/>
+            <circle cx="75" cy="75" r="48" fill="none" stroke="#EDE5D0" strokeWidth="18" strokeDasharray="78.4 223.2" strokeDashoffset="-187.0" transform="rotate(-90 75 75)"/>
+            <circle cx="75" cy="75" r="48" fill="none" stroke="#C4B89A" strokeWidth="18" strokeDasharray="36.2 265.4" strokeDashoffset="-265.4" transform="rotate(-90 75 75)"/>
+            <circle cx="75" cy="75" r="34" fill="#F5F0E6"/>
+            <text x="75" y="71" textAnchor="middle" fontFamily="Playfair Display,serif" fontSize="20" fontWeight="600" fill="#1C1208">182</text>
+            <text x="75" y="84" textAnchor="middle" fontFamily="DM Mono,monospace" fontSize="8" fill="#8B7D5A">PEOPLE</text>
+          </svg>
+          <div style={{display:'flex',flexDirection:'column',gap:4,marginTop:6}}>
+            {[
+              {color:'#C4842A',label:'Founders / CEOs',pct:'26%',border:false},
+              {color:'#1C1208',label:'Investors / VCs',pct:'14%',border:false},
+              {color:'#8B7D5A',label:'Senior Executives',pct:'22%',border:false},
+              {color:'#EDE5D0',label:'MBA Students',pct:'26%',border:true},
+              {color:'#C4B89A',label:'Other',pct:'12%',border:false},
+            ].map((l,i)=>(
+              <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,fontSize:11,color:'#1C1208'}}>
+                <span style={{display:'flex',alignItems:'center',gap:7}}>
+                  <div style={{width:8,height:8,flexShrink:0,background:l.color,border:l.border?'1px solid #C4B89A':'none'}}/>
+                  <span>{l.label}</span>
+                </span>
+                <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'#8B7D5A'}}>{l.pct}</span>
+              </div>
+            ))}
           </div>
         </div>
-      ))}
-    </div>
-  ) : null;
 
-  const companiesBlock = showCompanies ? (
-    <div
-      className="briefing-zone-block"
-      style={{
-        padding: 14,
-        borderTop: showDean ? `1px solid ${BORDER}` : undefined,
-      }}
-    >
-      <span style={zoneLabel()}>COMPANIES IN THE ROOM</span>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(2, 1fr)",
-          gap: 8,
-        }}
-        className="briefing-companies-grid"
-      >
-        {(briefing.companies ?? []).map((co, i) => {
-          const badge = companyBadgeStyle(co.company_type);
-          return (
-            <div
-              key={`${co.name}-${i}`}
-              role="button"
-              tabIndex={0}
-              onClick={goPeople}
-              onKeyDown={(e) => e.key === "Enter" && goPeople()}
-              style={{
-                border: `1px solid ${BORDER}`,
-                padding: "8px 10px",
-                cursor: "pointer",
-                transition: "background 0.15s",
-              }}
-              className="briefing-company-card"
-            >
-              <div
-                style={{
-                  ...sans,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  marginBottom: 2,
-                }}
-              >
-                {co.name}
-              </div>
-              <div style={{ ...mono, fontSize: 10, color: MUTED, marginBottom: 4 }}>
-                {co.attendee_name} · {co.attendee_title}
-              </div>
-              <div
-                style={{
-                  ...sans,
-                  fontSize: 10,
-                  color: MUTED,
-                  lineHeight: 1.35,
-                  marginBottom: 4,
-                }}
-              >
-                {co.why_relevant}
-              </div>
-              <span style={badge.style}>{badge.label}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  ) : null;
-
-  return (
-    <div style={{ background: PAPER, color: INK, width: "100%" }}>
-      <style>{`
-        .briefing-theme-row:hover .briefing-theme-title { color: ${AMBER}; }
-        .briefing-company-card:hover { background: ${AGED}; }
-        .briefing-shell { display: flex; flex-direction: column; width: 100%; }
-        .briefing-topbar {
-          display: flex; align-items: baseline; justify-content: space-between;
-          border-bottom: 1px solid ${BORDER}; padding: 10px 16px; flex-wrap: wrap; gap: 8px;
-        }
-        .briefing-topbar-left { display: flex; align-items: baseline; gap: 12px; }
-        .briefing-topbar-centre { flex: 1; text-align: center; min-width: 120px; }
-        .briefing-signals-section {
-          width: 100%;
-          padding: 16px;
-          border-bottom: 1px solid ${BORDER};
-        }
-        .briefing-signals-row {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-          gap: 10px;
-        }
-        .briefing-signal-card {
-          border: 1px solid ${BORDER};
-          border-radius: 0;
-          background: ${PAPER};
-          padding: 12px 14px;
-          min-height: 72px;
-        }
-        .briefing-two-col {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          width: 100%;
-          align-items: start;
-        }
-        .briefing-col-left {
-          border-right: 1px solid ${BORDER};
-        }
-        .briefing-companies-grid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 8px;
-        }
-        @media (max-width: 767px) {
-          .briefing-signals-row {
-            grid-template-columns: 1fr;
-          }
-          .briefing-two-col {
-            grid-template-columns: 1fr;
-          }
-          .briefing-col-left {
-            border-right: none;
-            border-bottom: 1px solid ${BORDER};
-          }
-          .briefing-companies-grid {
-            grid-template-columns: 1fr;
-          }
-          .briefing-topbar-centre {
-            text-align: left;
-            flex: 1 1 100%;
-            order: 3;
-          }
-        }
-      `}</style>
-
-      <div className="briefing-shell">
-        <header className="briefing-topbar">
-          <div className="briefing-topbar-left">
-            <span
-              style={{
-                ...mono,
-                fontSize: 10,
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                color: MUTED,
-              }}
-            >
-              Sideroom
-            </span>
-            <span style={{ ...sans, fontSize: 13, fontWeight: 600, color: INK }}>
-              {eventName}
-            </span>
-          </div>
-          <div className="briefing-topbar-centre">
-            {userGoal ? (
-              <span
-                style={{
-                  ...mono,
-                  fontSize: 11,
-                  fontStyle: "italic",
-                  color: MUTED,
-                }}
-              >
-                Goal: {userGoal}
-              </span>
-            ) : null}
-          </div>
-          <CentreButton onClick={goPeople}>SHOW MY MATCHES →</CentreButton>
-        </header>
-
-        {showSignals && (
-          <section className="briefing-signals-section">
-            <span
-              style={{
-                ...mono,
-                fontSize: 10,
-                fontWeight: 500,
-                textTransform: "uppercase",
-                letterSpacing: "0.1em",
-                color: AMBER,
-                display: "block",
-                marginBottom: 12,
-              }}
-            >
-              Intelligence signals
-            </span>
-            <div className="briefing-signals-row">
-              {signalCards.map((sig, i) => (
-                <article key={`${sig.company}-${i}`} className="briefing-signal-card">
-                  <p
-                    style={{
-                      ...sans,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: INK,
-                      margin: "0 0 6px",
-                      lineHeight: 1.3,
-                    }}
-                  >
-                    {sig.company}
-                  </p>
-                  <p
-                    style={{
-                      ...sans,
-                      fontSize: 12,
-                      fontWeight: 400,
-                      color: MUTED,
-                      margin: 0,
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {sig.signal_text}
-                  </p>
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
-
-        <div className="briefing-two-col">
-          <div className="briefing-col-left">
-            {showStats && (
-              <section
-                className="briefing-zone-block"
-                style={{ padding: 14, borderBottom: `1px solid ${BORDER}` }}
-              >
-                <span style={zoneLabel()}>THE ROOM</span>
-                {statRows
-                  .filter((row) => stats?.[row.key] != null)
-                  .map((row, i, visible) => {
-                    const val = stats?.[row.key];
-                    const display =
-                      row.suffix && typeof val === "number"
-                        ? `${val}${row.suffix}`
-                        : String(val);
-                    return (
-                      <div
-                        key={row.key}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "baseline",
-                          padding: "6px 0",
-                          borderBottom:
-                            i < visible.length - 1
-                              ? `1px solid ${BORDER}`
-                              : undefined,
-                        }}
-                      >
-                        <span style={{ ...mono, fontSize: 11, color: MUTED }}>
-                          {row.label}
-                        </span>
-                        <span
-                          style={{
-                            ...mono,
-                            fontSize: 18,
-                            fontWeight: 700,
-                            color: INK,
-                          }}
-                        >
-                          {display}
-                        </span>
-                      </div>
-                    );
-                  })}
-              </section>
-            )}
-            {themesBlock}
-            {archetypesBlock}
-          </div>
-
-          <div className="briefing-col-right">
-            {showDean && briefing.dean_note && (
-              <section className="briefing-zone-block" style={{ padding: 14 }}>
-                <span style={zoneLabel()}>BEFORE YOU WALK IN</span>
-                {renderAgendaParagraphs(briefing.dean_note.agenda_intelligence)}
-                {userGoal && briefing.dean_note.goal_advice ? (
-                  <div
-                    style={{
-                      borderTop: `1px solid ${BORDER}`,
-                      paddingTop: 12,
-                      marginTop: 14,
-                    }}
-                  >
-                    <span
-                      style={{
-                        ...mono,
-                        fontSize: 9,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.08em",
-                        color: MUTED,
-                        marginBottom: 6,
-                        display: "block",
-                      }}
-                    >
-                      Given your goal
-                    </span>
-                    {briefing.dean_note.goal_advice
-                      .split(/\n\n+/)
-                      .filter(Boolean)
-                      .map((p, i) => (
-                        <p
-                          key={i}
-                          style={{
-                            ...sans,
-                            fontSize: 11,
-                            lineHeight: 1.6,
-                            color: INK,
-                            margin: "0 0 10px",
-                          }}
-                        >
-                          {p}
-                        </p>
-                      ))}
-                  </div>
-                ) : null}
-                <p
-                  style={{
-                    marginTop: 12,
-                    ...sans,
-                    fontSize: 11,
-                    lineHeight: 1.6,
-                    color: INK,
-                  }}
-                >
-                  <span style={{ fontWeight: 600 }}>Leave with: </span>
-                  {briefing.dean_note.leave_with}
-                </p>
-              </section>
-            )}
-
-            {companiesBlock}
-
-            {showCustom && briefing.custom_section && (
-              <section
-                className="briefing-zone-block"
-                style={{
-                  padding: 14,
-                  borderTop: `1px solid ${BORDER}`,
-                }}
-              >
-                <span style={zoneLabel()}>{briefing.custom_section.label}</span>
-                <div
-                  style={{
-                    borderLeft: `2px solid ${AMBER}`,
-                    padding: "6px 0 6px 10px",
-                    ...sans,
-                    fontSize: 11,
-                    lineHeight: 1.5,
-                    color: INK,
-                  }}
-                >
-                  {briefing.custom_section.content}
+        {/* Industry bars */}
+        <div style={{padding:'16px 18px'}}>
+          <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,textTransform:'uppercase',letterSpacing:'0.1em',color:'#C4842A',marginBottom:10}}>Top industries</div>
+          <div style={{display:'flex',flexDirection:'column',gap:7}}>
+            {[
+              {label:'Tech & SaaS',pct:31},
+              {label:'Fintech & Banking',pct:22},
+              {label:'Consulting & PE',pct:17},
+              {label:'Deep Tech / Bio',pct:12},
+              {label:'Impact & Climate',pct:9},
+              {label:'Other',pct:9},
+            ].map((b,i)=>(
+              <div key={i}>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:11,marginBottom:3}}>
+                  <span style={{color:'#1C1208'}}>{b.label}</span>
+                  <span style={{fontFamily:"'DM Mono',monospace",color:'#8B7D5A',fontSize:10}}>{b.pct}%</span>
                 </div>
-              </section>
-            )}
-
-            <section
-              className="briefing-zone-block"
-              style={{
-                padding: 14,
-                borderTop: `1px solid ${BORDER}`,
-              }}
-            >
-              <span
-                style={{
-                  ...mono,
-                  fontSize: 10,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.08em",
-                  color: MUTED,
-                  marginBottom: 8,
-                  display: "block",
-                }}
-              >
-                Your matched attendees
-              </span>
-              <div
-                style={{
-                  ...mono,
-                  fontSize: 22,
-                  fontWeight: 700,
-                  color: INK,
-                  marginBottom: 4,
-                }}
-              >
-                {stats?.total_attendees ?? "—"}
+                <div style={{height:3,background:'#EDE5D0',width:'100%'}}>
+                  <div style={{height:3,background:'#C4842A',width:`${b.pct}%`}}/>
+                </div>
               </div>
-              <p
-                style={{
-                  ...sans,
-                  fontSize: 10,
-                  color: MUTED,
-                  marginBottom: 12,
-                }}
-              >
-                people worth meeting based on your goal
-              </p>
-              <CentreButton onClick={goPeople} fullWidth>
-                SHOW MY MATCHES →
-              </CentreButton>
-            </section>
+            ))}
           </div>
         </div>
       </div>
+
+      {/* SIGNALS */}
+      <div style={{borderBottom:'1px solid #C4B89A',padding:'14px 18px'}}>
+        <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,textTransform:'uppercase',letterSpacing:'0.1em',color:'#C4842A',marginBottom:8}}>Intelligence signals</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
+          {[
+            {tag:'Fundraising',head:'VC activity is unusually concentrated',sub:'6 active GPs attending — mostly seed/Series A. Oriol Juncosa (Plus Partners) closing a new fund.'},
+            {tag:'Hiring wave',head:'25% of companies actively hiring',sub:'Tech and fintech companies are scaling fast. Multiple CTO-level openings flagged across attendee companies.'},
+            {tag:'Agenda intel',head:'Real action happens after Steve Blank',sub:'Closing keynote Day 2 (18:45) is the inflection point — conversations that follow tend to convert into intros.'},
+          ].map((s,i)=>(
+            <div key={i} style={{border:'1px solid #C4B89A',padding:'11px 13px',background:'#F5F0E6'}}>
+              <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,textTransform:'uppercase',letterSpacing:'0.06em',color:'#C4842A',marginBottom:5}}>{s.tag}</div>
+              <div style={{fontSize:12,fontWeight:500,color:'#1C1208',marginBottom:3}}>{s.head}</div>
+              <div style={{fontSize:11,color:'#8B7D5A',lineHeight:1.4}}>{s.sub}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* DEAN NOTE + COMPANIES */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',borderBottom:'1px solid #C4B89A'}}>
+        <div style={{padding:'16px 18px',borderRight:'1px solid #C4B89A'}}>
+          <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,textTransform:'uppercase',letterSpacing:'0.1em',color:'#C4842A',marginBottom:10}}>Before you walk in</div>
+          <p style={{fontSize:12,color:'#1C1208',lineHeight:1.6,marginBottom:10}}>This isn't a panel conference — it's a reunion with deal potential. The ESADE network runs deep, so warm intros from existing alumni carry disproportionate weight. <strong style={{fontWeight:500}}>Don't pitch cold.</strong></p>
+          <p style={{fontSize:12,color:'#1C1208',lineHeight:1.6,marginBottom:10}}>Day 3 is a sailboat trip. That's your highest-value window — 4 hours, no agenda, no stage. The real conversations happen on the water.</p>
+          <p style={{fontSize:12,color:'#8B7D5A',lineHeight:1.6}}>Leave with: 3 warm intros + 1 follow-up meeting booked before the boat docks.</p>
+        </div>
+        <div style={{padding:'16px 18px'}}>
+          <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,textTransform:'uppercase',letterSpacing:'0.1em',color:'#C4842A',marginBottom:10}}>Key companies in the room</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+            {[
+              {name:'Plug and Play',type:'Accelerator'},
+              {name:'Plus Partners',type:'Investor'},
+              {name:'Suma Capital',type:'Investor'},
+              {name:'Neuroelectrics',type:'Deep Tech'},
+              {name:'allWomen',type:'Ed-Tech'},
+              {name:'ISDI',type:'Partner'},
+              {name:'Flywire',type:'Fintech'},
+              {name:'Satellogic',type:'Deep Tech'},
+            ].map((c,i)=>(
+              <div key={i} style={{border:'1px solid #C4B89A',padding:'5px 9px',display:'flex',flexDirection:'column',gap:1}}>
+                <span style={{fontSize:11,fontWeight:500,color:'#1C1208'}}>{c.name}</span>
+                <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'#8B7D5A',textTransform:'uppercase',letterSpacing:'0.05em'}}>{c.type}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* FOOTER CTA */}
+      <div style={{padding:'14px 18px',display:'flex',alignItems:'center',justifyContent:'space-between',background:'#EDE5D0'}}>
+        <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'#8B7D5A'}}>Matched to 182 attendees · AI-scored for your goal</span>
+        <Link href="/esade-2026/people" style={{fontFamily:"'DM Mono',monospace",fontSize:11,textTransform:'uppercase',letterSpacing:'0.08em',background:'#1C1208',color:'#F5F0E6',border:'none',padding:'10px 22px',cursor:'pointer',textDecoration:'none',display:'inline-block'}}>
+          Show my matches →
+        </Link>
+      </div>
+
     </div>
-  );
+  )
 }

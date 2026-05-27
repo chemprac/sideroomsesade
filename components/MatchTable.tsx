@@ -807,6 +807,363 @@ function MatchTableInner({
 
   return (
     <div className="match-table-wrap">
+      <style>{`
+        @media (max-width: 768px) {
+          .match-table-wrap {
+            width: 100%;
+          }
+
+          .match-table-row {
+            background: #F5F0E6 !important;
+            border: none !important;
+            border-bottom: 1px solid #C4B89A !important;
+            margin-bottom: 0 !important;
+            border-radius: 0 !important;
+          }
+
+          .match-table-row.row-expanded {
+            background: #EDE5D0 !important;
+          }
+
+          .match-table-row-clickable {
+            padding: 14px 16px !important;
+          }
+
+          .match-table-row-clickable > div:first-child {
+            display: grid !important;
+            grid-template-columns: minmax(0, 1fr) auto auto !important;
+            align-items: center !important;
+            gap: 0 10px !important;
+          }
+
+          .match-table-row-clickable > div:first-child > div:nth-child(1) {
+            grid-column: 1 !important;
+            grid-row: 1 !important;
+            min-width: 0 !important;
+            border-right: none !important;
+            padding: 0 !important;
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            gap: 8px !important;
+            margin-bottom: 10px !important;
+          }
+
+          .match-table-row-clickable > div:first-child > div:nth-child(1) span:nth-child(1) {
+            font-family: var(--font-mono), "DM Mono", monospace !important;
+            font-size: 9px !important;
+            color: #8B7D5A !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.08em !important;
+            white-space: nowrap !important;
+          }
+
+          .match-table-row-clickable > div:first-child > div:nth-child(1) span:nth-child(2) {
+            font-family: var(--font-mono), "DM Mono", monospace !important;
+            font-size: 11px !important;
+            font-weight: 500 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.06em !important;
+            line-height: 1 !important;
+            white-space: normal !important;
+          }
+
+          .match-table-row-clickable > div:first-child > div:nth-child(1) span:nth-child(3) {
+            width: 8px !important;
+            height: 8px !important;
+            border-radius: 50% !important;
+            flex-shrink: 0 !important;
+          }
+
+          .match-table-row-clickable > div:first-child > div:nth-child(2) {
+            grid-column: 1 / -1 !important;
+            grid-row: 2 !important;
+            border-right: none !important;
+            padding: 0 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 0 !important;
+            margin-bottom: 10px !important;
+            min-width: 0 !important;
+          }
+
+          .match-table-row-clickable > div:first-child > div:nth-child(2) > div:nth-child(1) {
+            font-family: var(--font-heading), "Playfair Display", serif !important;
+            font-size: 15px !important;
+            font-weight: 600 !important;
+            color: #1C1208 !important;
+            margin: 0 0 2px !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+            white-space: normal !important;
+            line-height: 1.25 !important;
+          }
+
+          .match-table-row-clickable > div:first-child > div:nth-child(2) > div:nth-child(2) {
+            font-family: var(--font-body), "DM Sans", system-ui, sans-serif !important;
+            font-size: 12px !important;
+            color: #8B7D5A !important;
+            margin: 0 !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+            white-space: normal !important;
+            line-height: 1.35 !important;
+          }
+
+          .match-table-row-clickable > div:first-child > div:nth-child(3) {
+            grid-column: 1 / -1 !important;
+            grid-row: 3 !important;
+            border-right: none !important;
+            padding: 0 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 0 !important;
+            min-width: 0 !important;
+          }
+
+          .match-table-row-clickable > div:first-child > div:nth-child(3) > div:first-child {
+            font-family: var(--font-mono), "DM Mono", monospace !important;
+            font-size: 9px !important;
+            text-transform: uppercase !important;
+            color: #8B7D5A !important;
+            letter-spacing: 0.08em !important;
+            margin: 0 0 4px !important;
+          }
+
+          .match-table-signal {
+            font-family: var(--font-body), "DM Sans", system-ui, sans-serif !important;
+            font-size: 12px !important;
+            color: #1C1208 !important;
+            line-height: 1.55 !important;
+            white-space: normal !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+            overflow-wrap: anywhere !important;
+            word-break: normal !important;
+          }
+
+          .match-table-row-clickable > div:first-child > div:nth-child(4) {
+            grid-column: 2 !important;
+            grid-row: 1 !important;
+            padding: 0 !important;
+            border-right: none !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 10px !important;
+            margin-bottom: 10px !important;
+          }
+
+          .match-table-contact-icons {
+            display: flex !important;
+            align-items: center !important;
+            gap: 10px !important;
+          }
+
+          .match-table-icon-btn {
+            width: 28px !important;
+            height: 28px !important;
+            min-width: 28px !important;
+            border: 1px solid #1C1208 !important;
+            color: #1C1208 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 0 !important;
+            box-sizing: border-box !important;
+            text-decoration: none !important;
+          }
+
+          .match-table-icon-btn.disabled {
+            border-color: #C4B89A !important;
+            color: #8B7D5A !important;
+          }
+
+          .match-table-row-clickable > div:first-child > div:nth-child(5) {
+            grid-column: 3 !important;
+            grid-row: 1 !important;
+            padding: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            color: #8B7D5A !important;
+            margin-bottom: 10px !important;
+          }
+
+          .match-table-row-clickable > div:first-child > div:nth-child(5) > span {
+            width: 14px !important;
+            height: 14px !important;
+            color: #8B7D5A !important;
+            font-size: 14px !important;
+            transition: transform 0.2s ease !important;
+          }
+
+          .match-table-row-clickable > div:first-child + div {
+            max-height: 600px !important;
+            overflow: hidden !important;
+            transition: max-height 0.25s ease !important;
+            background: transparent !important;
+            border-top: 1px solid #C4B89A !important;
+            margin-top: 14px !important;
+            padding-top: 14px !important;
+          }
+
+          .match-table-row-clickable > div:first-child + div > div:first-child {
+            padding: 0 !important;
+            border-bottom: none !important;
+            display: flex !important;
+            flex-wrap: wrap !important;
+            gap: 5px !important;
+            margin-bottom: 14px !important;
+          }
+
+          .match-table-row-clickable > div:first-child + div > div:first-child span {
+            font-family: var(--font-mono), "DM Mono", monospace !important;
+            font-size: 9px !important;
+            color: #1C1208 !important;
+            border: 1px solid #C4B89A !important;
+            padding: 2px 6px !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.08em !important;
+          }
+
+          .match-table-row-clickable > div:first-child + div > div:nth-child(2) {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 14px !important;
+          }
+
+          .match-table-row-clickable > div:first-child + div > div:nth-child(2) > div {
+            padding: 0 !important;
+            border-left: none !important;
+            min-width: 0 !important;
+          }
+
+          .match-table-row-clickable > div:first-child + div > div:nth-child(2) > div:first-child {
+            order: 1 !important;
+          }
+
+          .match-table-row-clickable > div:first-child + div > div:nth-child(2) > div:nth-child(2) {
+            order: 3 !important;
+          }
+
+          .match-table-row-clickable > div:first-child + div > div:nth-child(2) p {
+            font-family: var(--font-body), "DM Sans", system-ui, sans-serif !important;
+            font-size: 12px !important;
+            line-height: 1.6 !important;
+            color: #1C1208 !important;
+            margin: 0 !important;
+          }
+
+          .match-table-row-clickable > div:first-child + div > div:nth-child(2) > div > div:first-child {
+            display: block !important;
+            font-family: var(--font-mono), "DM Mono", monospace !important;
+            font-size: 9px !important;
+            text-transform: uppercase !important;
+            color: #8B7D5A !important;
+            letter-spacing: 0.08em !important;
+            margin: 0 0 6px !important;
+          }
+
+          .match-table-row-clickable > div:first-child + div > div:nth-child(2) > div > div:first-child span + span {
+            display: none !important;
+          }
+
+          .row-locked {
+            padding: 14px 16px !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 10px !important;
+            filter: blur(0.8px) !important;
+            overflow: hidden !important;
+          }
+
+          .row-locked > div:first-child {
+            min-width: 0 !important;
+            border-right: none !important;
+            padding: 0 !important;
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            gap: 8px !important;
+          }
+
+          .row-locked > div:nth-child(2) {
+            flex: 1 !important;
+            display: flex !important;
+            align-items: center !important;
+          }
+
+          .row-locked > div:nth-child(2) > div:first-child {
+            flex: 1 !important;
+            border-right: none !important;
+            padding: 0 !important;
+          }
+
+          .row-locked > div:nth-child(2) > div:first-child > div:first-child {
+            font-family: var(--font-heading), "Playfair Display", serif !important;
+            font-size: 15px !important;
+            font-weight: 600 !important;
+            color: #1C1208 !important;
+          }
+
+          .row-locked > div:nth-child(2) > div:first-child > div:nth-child(2) {
+            height: 10px !important;
+            max-width: 150px !important;
+            margin-top: 5px !important;
+          }
+
+          .row-locked > div:nth-child(2) > div:nth-child(2),
+          .row-locked > div:nth-child(2) > div:nth-child(3) {
+            display: none !important;
+          }
+
+          .row-locked > div:nth-child(2) > div:nth-child(4) {
+            margin-left: auto !important;
+            padding: 0 !important;
+            color: #8B7D5A !important;
+            border-right: none !important;
+            font-size: 16px !important;
+          }
+
+          .match-table-wrap > div > div[style*="margin: 10px 0"] {
+            margin: 0 !important;
+          }
+
+          .match-table-wrap > div > div[style*="margin: 10px 0"] > * {
+            width: 100% !important;
+            background: #1C1208 !important;
+            padding: 16px !important;
+            text-align: center !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+          }
+
+          .match-table-wrap > div > div[style*="margin: 10px 0"] p,
+          .match-table-wrap > div > div[style*="margin: 10px 0"] span {
+            font-family: var(--font-mono), "DM Mono", monospace !important;
+            font-size: 11px !important;
+            color: #C4B89A !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.08em !important;
+            line-height: 1.5 !important;
+            margin: 0 0 10px !important;
+          }
+
+          .match-table-wrap > div > div[style*="margin: 10px 0"] button,
+          .match-table-wrap > div > div[style*="margin: 10px 0"] a {
+            font-family: var(--font-mono), "DM Mono", monospace !important;
+            font-size: 11px !important;
+            color: #F5F0E6 !important;
+            background: #C4842A !important;
+            border: none !important;
+            padding: 10px 0 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.1em !important;
+            width: 100% !important;
+            border-radius: 0 !important;
+          }
+        }
+      `}</style>
       <div>{body}</div>
       {hasMore ? (
         <div
