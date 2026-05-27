@@ -146,6 +146,28 @@ export function MatchList({
         onHitListClick={() => setDrawerOpen(true)}
       />
       <div className="people-page">
+        <div className="mobile-desktop-notice">Best viewed on desktop</div>
+        <style>{`
+          .mobile-desktop-notice {
+            display: none;
+          }
+
+          @media (max-width: 768px) {
+            .mobile-desktop-notice {
+              display: block;
+              margin: 0 0 12px;
+              padding: 10px 14px;
+              border: 1px solid #C4B89A;
+              background: #EDE5D0;
+              color: #8B7D5A;
+              font-family: var(--font-mono), "DM Mono", monospace;
+              font-size: 10px;
+              text-transform: uppercase;
+              letter-spacing: 0.08em;
+              text-align: center;
+            }
+          }
+        `}</style>
         <div className="people-page-header">
           <h1 className="font-heading" style={{ fontSize: 26 }}>
             Your matches at {eventName}
