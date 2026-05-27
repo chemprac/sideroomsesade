@@ -12,7 +12,7 @@ export function PeopleLoading({
   sessionId: string;
 }) {
   const router = useRouter();
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<"generic" | "not_ready" | false>(false);
   const [retrying, setRetrying] = useState(false);
 
   const runMatch = useCallback(async () => {
@@ -32,7 +32,9 @@ export function PeopleLoading({
       return;
     }
 
-    setError(true);
+    setError(
+      data.error === "precomputed_not_ready" ? "not_ready" : "generic"
+    );
   }, [sessionId, router]);
 
   useEffect(() => {
@@ -53,18 +55,20 @@ export function PeopleLoading({
               style={{ height: 28, width: 240, margin: "0 auto 16px" }}
             />
             <p className="muted-text">
-              {retrying
-                ? "Scoring attendees…"
-                : "Finding your matches…"}
+              {retrying ? "Loading your list…" : "Loading your match list…"}
             </p>
           </>
         ) : (
           <>
             <p className="font-heading" style={{ fontSize: 20 }}>
-              Matching hit a snag
+              {error === "not_ready"
+                ? "Match lists aren’t ready yet"
+                : "Couldn’t load matches"}
             </p>
             <p className="muted-text" style={{ marginTop: 8, marginBottom: 20 }}>
-              Couldn&apos;t load matches. Try again.
+              {error === "not_ready"
+                ? "An admin needs to run “Precompute all 4 match lists” for this event, then try again."
+                : "Something went wrong. Try again."}
             </p>
             <button
               type="button"

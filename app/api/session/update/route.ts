@@ -23,9 +23,7 @@ export async function POST(request: NextRequest) {
     .eq("id", sessionId)
     .single();
 
-  const icpChanged =
-    current?.icp_type !== icp_type ||
-    (current?.icp_context ?? "") !== (icp_context ?? "");
+  const icpChanged = current?.icp_type !== icp_type;
 
   if (icpChanged) {
     await Promise.all([

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase";
 import { getIcpTypeFromCookie } from "@/lib/icp-cookie";
-import { getUserGoalFromCookie } from "@/lib/user-goal";
+import { copyEventMatchesToSession } from "@/lib/event-icp-matches";
 import { SESSION_COOKIE } from "@/lib/session";
 import { resolveEventFromUrl } from "@/lib/events";
 import { MatchList } from "@/components/MatchList";
@@ -38,7 +38,6 @@ export default async function PeoplePage({
   const cookieStore = await cookies();
   const sessionId = cookieStore.get(SESSION_COOKIE)?.value;
   const icpFromCookie = await getIcpTypeFromCookie();
-  const userGoal = await getUserGoalFromCookie();
 
   if (!sessionId || !icpFromCookie) {
     redirect("/");
@@ -56,10 +55,7 @@ export default async function PeoplePage({
     redirect("/");
   }
 
-  const icpContext = userGoal ?? sessionRow.icp_context ?? null;
-  const icpChanged =
-    sessionRow.icp_type !== icpFromCookie ||
-    (sessionRow.icp_context ?? "") !== (icpContext ?? "");
+  const icpChanged = sessionRow.icp_type !== icpFromCookie;
 
   if (!sessionRow.icp_type || icpChanged) {
     if (icpChanged && sessionRow.icp_type) {
@@ -73,7 +69,6 @@ export default async function PeoplePage({
       .from("sessions")
       .update({
         icp_type: icpFromCookie,
-        icp_context: icpContext,
         updated_at: new Date().toISOString(),
       })
       .eq("id", sessionId);
@@ -99,7 +94,8 @@ export default async function PeoplePage({
       .from("matches")
       .select(MATCH_SELECT)
       .eq("session_id", sessionId)
-      .order("score", { ascending: false }),
+      .order("score", { ascending: false })
+      .order("attendee_id", { ascending: true }),
     supabase
       .from("saved_contacts")
       .select(`*, attendee:attendees(${ATTENDEE_EMBED})`)
@@ -110,7 +106,30 @@ export default async function PeoplePage({
     console.error("matches fetch:", matchError.message);
   }
 
-  const matches = (matchRows ?? [])
+  let rows = matchRows ?? [];
+  if (rows.length === 0 && icpFromCookie) {
+    try {
+      const copied = await copyEventMatchesToSession(
+        supabase,
+        dbSlug,
+        icpFromCookie,
+        sessionId
+      );
+      if (copied > 0) {
+        const { data: refetched } = await supabase
+          .from("matches")
+          .select(MATCH_SELECT)
+          .eq("session_id", sessionId)
+          .order("score", { ascending: false })
+          .order("attendee_id", { ascending: true });
+        rows = refetched ?? [];
+      }
+    } catch (err) {
+      console.error("Precomputed match copy on people page:", err);
+    }
+  }
+
+  const matches = rows
     .map((m) => {
       const embedded = resolveEmbeddedAttendee(m.attendee);
       if (!embedded) return null;

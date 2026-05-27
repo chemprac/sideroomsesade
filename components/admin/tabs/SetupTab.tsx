@@ -268,6 +268,61 @@ export function SetupTab({
         Fetch signals
       </button>
 
+      <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "28px 0" }} />
+
+      <h2 className="font-heading" style={{ fontSize: 20, marginBottom: 8 }}>
+        Match lists (4 goals)
+      </h2>
+      <p className="muted-text" style={{ marginBottom: 12, fontSize: 13 }}>
+        Score every attendee once per goal (investor, sales, partners, job).
+        After this, users with no custom goal text get instant lists — no wait
+        on open.
+      </p>
+      <button
+        type="button"
+        className="btn-primary"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          clearLog();
+          const goals = [
+            ["investor", "Looking for founders"],
+            ["sales", "Looking for clients"],
+            ["partners", "Looking for partners"],
+            ["job", "Looking for a job"],
+          ] as const;
+          appendLog(["— Precomputing match lists…"]);
+          for (const [icpType, label] of goals) {
+            appendLog([`— ${label} (${icpType})…`]);
+            const res = await adminFetch(
+              secret,
+              `/api/admin/events/${eventSlug}/precompute-matches`,
+              {
+                method: "POST",
+                body: JSON.stringify({ icpType, force: false }),
+              }
+            );
+            const data = await res.json();
+            if (!res.ok) {
+              appendLog([`✗ ${icpType}: ${data.error ?? "failed"}`]);
+              continue;
+            }
+            const row = data.results?.[0];
+            if (row?.skipped) {
+              appendLog([`✓ ${icpType}: ${row.matched} cached`]);
+            } else {
+              appendLog([
+                `✓ ${icpType}: ${row?.matched ?? 0} scored (${row?.source ?? "?"})`,
+              ]);
+            }
+          }
+          appendLog(["— Done"]);
+          setBusy(false);
+        }}
+      >
+        Precompute all 4 match lists
+      </button>
+
       <ProgressLog lines={log} />
     </div>
   );

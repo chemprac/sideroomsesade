@@ -74,7 +74,7 @@ export function IcpSelector({ eventSlug, onComplete }: IcpSelectorProps) {
       fetch("/api/match", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, force: true }),
+        body: JSON.stringify({ sessionId }),
       }).catch(() => {});
     }
 

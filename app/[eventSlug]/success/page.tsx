@@ -22,7 +22,16 @@ function SuccessContent() {
 
   useEffect(() => {
     let attempts = 0;
+    const checkoutSessionId = searchParams.get("session_id");
     const poll = async () => {
+      if (checkoutSessionId) {
+        await fetch("/api/checkout/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ checkoutSessionId }),
+        }).catch(() => {});
+      }
+
       const res = await fetch("/api/session/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -42,7 +51,7 @@ function SuccessContent() {
       }
     };
     poll();
-  }, [eventSlug]);
+  }, [eventSlug, searchParams]);
 
   return (
     <>

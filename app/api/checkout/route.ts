@@ -28,8 +28,11 @@ export async function POST(request: NextRequest) {
     event?.paywall_message ??
     "Unlock full research for every match at this event.";
 
+  const configuredBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
   const baseUrl =
-    process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
+    process.env.NODE_ENV === "production" && configuredBaseUrl
+      ? configuredBaseUrl
+      : request.nextUrl.origin;
 
   const stripe = new Stripe(stripeKey);
 
