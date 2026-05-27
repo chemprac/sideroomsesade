@@ -196,11 +196,9 @@ function DrawerLabel({ text }: { text: string }) {
 
 function MatchDrawer({
   matchReason,
-  latestIntel,
   stamps,
 }: {
   matchReason: string;
-  latestIntel: string | null | undefined;
   stamps: string[];
 }) {
   return (
@@ -241,8 +239,7 @@ function MatchDrawer({
 
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
+          display: "block",
         }}
       >
         <div style={{ padding: "18px 16px", minWidth: 0 }}>
@@ -257,28 +254,6 @@ function MatchDrawer({
             }}
           >
             {matchReason}
-          </p>
-        </div>
-
-        <div
-          style={{
-            padding: "18px 16px",
-            borderLeft: "1px solid #C4B89A",
-            minWidth: 0,
-          }}
-        >
-          <DrawerLabel text="Latest intelligence" />
-          <p
-            style={{
-              margin: 0,
-              fontFamily: "var(--font-body), system-ui, sans-serif",
-              fontSize: 12,
-              lineHeight: 1.6,
-              color: "#1C1208",
-              whiteSpace: "pre-wrap",
-            }}
-          >
-            {latestIntel?.trim() ? latestIntel : "—"}
           </p>
         </div>
       </div>
@@ -551,9 +526,6 @@ function MatchTableInner({
         const stamps = buildStamps(profile);
         const signalText =
           buildLiveSignal(profile, attendee) || m.match_reason || "—";
-        const latestIntel =
-          (m as unknown as { latest_intel?: string | null }).latest_intel ??
-          null;
         nodes.push(
           <div
             key={m.attendee_id}
@@ -745,7 +717,6 @@ function MatchTableInner({
             {expanded ? (
               <MatchDrawer
                 matchReason={m.match_reason}
-                latestIntel={latestIntel}
                 stamps={stamps}
               />
             ) : null}
