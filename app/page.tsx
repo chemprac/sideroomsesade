@@ -100,7 +100,7 @@ export default function Home() {
           lineHeight: 1.4,
         }}
       >
-        ESADE MBA Alumni Forum · Barcelona · May 28–30
+        ESADE Entrepreneurship Summit 2026 · Barcelona · May 28–30
       </p>
 
       <h1

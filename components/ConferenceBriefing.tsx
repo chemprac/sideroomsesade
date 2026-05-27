@@ -10,7 +10,7 @@ export default function ConferenceBriefing() {
       <div style={{borderBottom:'1px solid #C4B89A',padding:'10px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',background:'#EDE5D0'}}>
         <div style={{display:'flex',flexDirection:'column',gap:2}}>
           <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'#8B7D5A',textTransform:'uppercase',letterSpacing:'0.08em'}}>Conference Intelligence Brief</span>
-          <span style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:600,color:'#1C1208'}}>ESADE MBA Alumni Forum 2026</span>
+          <span style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:600,color:'#1C1208'}}>ESADE Entrepreneurship Summit 2026</span>
         </div>
         <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'#8B7D5A',textTransform:'uppercase',letterSpacing:'0.08em'}}>Barcelona · May 28–30</span>
       </div>
