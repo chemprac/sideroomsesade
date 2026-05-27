@@ -18,7 +18,6 @@ type SignupForm = {
   company: string;
   title: string;
   nextConference: string;
-  feedbackOptIn: boolean;
 };
 
 const initialForm: SignupForm = {
@@ -27,7 +26,6 @@ const initialForm: SignupForm = {
   company: "",
   title: "",
   nextConference: "",
-  feedbackOptIn: false,
 };
 
 function Field({
@@ -200,26 +198,6 @@ export function PaywallModal({
             onChange={(value) => updateForm("nextConference", value)}
             placeholder="e.g. SaaStr, Slush, Web Summit"
           />
-
-          <label
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: 8,
-              fontSize: 13,
-              color: "var(--muted)",
-              lineHeight: 1.4,
-              margin: "6px 0 12px",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={form.feedbackOptIn}
-              onChange={(e) => updateForm("feedbackOptIn", e.target.checked)}
-              style={{ marginTop: 2 }}
-            />
-            <span>Can we email you for feedback on your experience?</span>
-          </label>
 
           {signupError && (
             <p style={{ color: "var(--stamp-amber)", fontSize: 13, marginBottom: 8 }}>
