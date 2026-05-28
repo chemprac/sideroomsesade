@@ -1,2 +1,2 @@
-export const FREE_PREVIEW_ROWS = 10;
-export const PAYWALL_BANNER_AFTER_RANK = 12;
+export const FREE_PREVIEW_ROWS = 25;
+export const PAYWALL_BANNER_AFTER_RANK = FREE_PREVIEW_ROWS + 2;

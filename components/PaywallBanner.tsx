@@ -1,7 +1,5 @@
 "use client";
 
-import { FREE_PREVIEW_ROWS } from "@/lib/paywall";
-
 interface PaywallBannerProps {
   totalCount: number;
   priceDisplay?: string;
@@ -11,7 +9,6 @@ interface PaywallBannerProps {
 }
 
 export function PaywallBanner({
-  totalCount,
   onCheckout,
   onAccessCode,
   loading,
@@ -19,8 +16,7 @@ export function PaywallBanner({
   return (
     <div className="paywall-banner paywall-banner-sticky">
       <p className="paywall-banner-text">
-        You&apos;re seeing {FREE_PREVIEW_ROWS} of {totalCount} attendees. Sign up
-        to unlock everyone.
+        Sign up for free to see all attendees and filters
       </p>
       <button
         type="button"

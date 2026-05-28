@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { FREE_PREVIEW_ROWS } from "@/lib/paywall";
 
 interface PaywallModalProps {
   open: boolean;
@@ -68,7 +67,6 @@ function Field({
 
 export function PaywallModal({
   open,
-  lockedCount,
   sessionId,
   onClose,
   onUnlockSuccess,
@@ -152,7 +150,7 @@ export function PaywallModal({
       <div className="paywall-modal" onClick={(e) => e.stopPropagation()}>
         <div className="paywall-seal">Official · SR</div>
         <h2 className="font-heading" style={{ fontSize: 22, textAlign: "center" }}>
-          You&apos;ve seen {FREE_PREVIEW_ROWS}. Unlock {lockedCount} more.
+          Sign up for free to see all attendees and filters
         </h2>
         <p className="muted-text" style={{ textAlign: "center", marginTop: 8, fontSize: 13 }}>
           Tell us who you are and get instant full access.
