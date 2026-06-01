@@ -2,7 +2,12 @@
 
 import Link from 'next/link'
 
-export default function ConferenceBriefing() {
+type ConferenceBriefingProps = {
+  eventSlug: string
+  firstIcpId: string
+}
+
+export default function ConferenceBriefing({ eventSlug, firstIcpId }: ConferenceBriefingProps) {
   return (
     <div style={{background:'#F5F0E6',fontFamily:"'DM Sans',sans-serif",color:'#1C1208',width:'100%',border:'1px solid #C4B89A'}}>
 
@@ -140,11 +145,22 @@ export default function ConferenceBriefing() {
       </div>
 
       {/* FOOTER CTA */}
-      <div style={{padding:'14px 18px',display:'flex',alignItems:'center',justifyContent:'space-between',background:'#EDE5D0'}}>
+      <div style={{padding:'14px 18px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12,background:'#EDE5D0'}}>
         <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'#8B7D5A'}}>Matched to 182 attendees · AI-scored for your goal</span>
-        <Link href="/esade-2026/people" style={{fontFamily:"'DM Mono',monospace",fontSize:11,textTransform:'uppercase',letterSpacing:'0.08em',background:'#1C1208',color:'#F5F0E6',border:'none',padding:'10px 22px',cursor:'pointer',textDecoration:'none',display:'inline-block'}}>
-          Show my matches →
-        </Link>
+        <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+          <Link
+            href={`/${eventSlug}/companies?icp=${encodeURIComponent(firstIcpId)}`}
+            style={{fontFamily:"'DM Mono',monospace",fontSize:10,textTransform:'uppercase',letterSpacing:'0.08em',background:'#1C1208',color:'#F5F0E6',border:'none',padding:'10px 22px',cursor:'pointer',textDecoration:'none',display:'inline-block',borderRadius:2}}
+          >
+            See matched companies →
+          </Link>
+          <Link
+            href={`/${eventSlug}/people?icp=${encodeURIComponent(firstIcpId)}`}
+            style={{fontFamily:"'DM Mono',monospace",fontSize:10,textTransform:'uppercase',letterSpacing:'0.08em',background:'transparent',color:'#1C1208',border:'1px solid #1C1208',padding:'10px 22px',cursor:'pointer',textDecoration:'none',display:'inline-block',borderRadius:2}}
+          >
+            See matched people →
+          </Link>
+        </div>
       </div>
 
     </div>

@@ -96,3 +96,27 @@ export async function copyEventMatchesToSession(
 
   return sessionRows.length;
 }
+
+const EVENT_MATCH_ATTENDEE_EMBED =
+  "id, event_slug, name, first_name, last_name, title, company, email, linkedin_url, linkedin_id, bio_summary";
+
+/** Load precomputed people matches for an event × ICP (any icp id from event_config). */
+export async function loadEventIcpMatchRows(
+  supabase: SupabaseClient,
+  eventSlug: string,
+  icpType: string
+) {
+  const { data, error } = await supabase
+    .from("event_icp_matches")
+    .select(
+      `attendee_id, score, tier, match_reason, open_with, tags, attendee:attendees(${EVENT_MATCH_ATTENDEE_EMBED}, attendee_profiles(profile))`
+    )
+    .eq("event_slug", eventSlug)
+    .eq("icp_type", icpType)
+    .eq("algorithm_version", MATCH_ALGORITHM_VERSION)
+    .order("score", { ascending: false })
+    .order("attendee_id", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}

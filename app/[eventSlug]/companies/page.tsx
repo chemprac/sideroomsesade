@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { CompaniesMatchView } from "@/components/CompaniesMatchView";
 import { createServerClient } from "@/lib/supabase";
 import { resolveEventFromUrl } from "@/lib/events";
 import {
@@ -10,17 +11,16 @@ import {
 } from "@/lib/event-config";
 import { ensureSession } from "@/lib/ensure-session";
 import { getIcpTypeFromCookie } from "@/lib/icp-cookie";
-import { PeopleMatchView } from "@/components/PeopleMatchView";
 
-export default async function PeoplePage({
+export default async function CompaniesPage({
   params,
   searchParams,
 }: {
   params: Promise<{ eventSlug: string }>;
-  searchParams: Promise<{ icp?: string; company?: string }>;
+  searchParams: Promise<{ icp?: string }>;
 }) {
   const { eventSlug } = await params;
-  const { icp: queryIcp, company: companyFilter } = await searchParams;
+  const { icp: queryIcp } = await searchParams;
 
   const resolved = await resolveEventFromUrl(eventSlug);
   if (!resolved) redirect("/");
@@ -31,11 +31,18 @@ export default async function PeoplePage({
   const sessionId = await ensureSession(dbSlug);
   if (!sessionId) redirect("/");
 
-  const { data: eventRow } = await supabase
-    .from("events")
-    .select("name, event_config")
-    .eq("slug", dbSlug)
-    .single();
+  const [{ data: eventRow }, { count: analysedCount }] = await Promise.all([
+    supabase
+      .from("events")
+      .select("name, event_config")
+      .eq("slug", dbSlug)
+      .single(),
+    supabase
+      .from("company_profiles")
+      .select("*", { count: "exact", head: true })
+      .eq("event_slug", dbSlug)
+      .not("website_summary", "is", null),
+  ]);
 
   const eventConfig = parseEventConfig(eventRow?.event_config);
   const icps = getEventIcps(eventConfig, dbSlug);
@@ -48,13 +55,13 @@ export default async function PeoplePage({
 
   return (
     <Suspense fallback={<div className="match-page">Loading…</div>}>
-      <PeopleMatchView
+      <CompaniesMatchView
         eventSlug={eventSlug}
         eventName={eventRow?.name ?? "Conference"}
         dbSlug={dbSlug}
         icps={icps}
         activeIcp={activeIcp}
-        initialCompanyFilter={companyFilter ?? ""}
+        totalAnalysed={analysedCount ?? 0}
       />
     </Suspense>
   );

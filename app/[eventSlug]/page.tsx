@@ -1,9 +1,36 @@
 import ConferenceBriefing from "@/components/ConferenceBriefing";
+import { createServerClient } from "@/lib/supabase";
+import { resolveEventFromUrl } from "@/lib/events";
+import {
+  getDefaultIcpId,
+  getEventIcps,
+  parseEventConfig,
+  resolveActiveIcp,
+} from "@/lib/event-config";
 
 export default async function EventBriefingPage({
-  params: _params,
+  params,
 }: {
   params: Promise<{ eventSlug: string }>;
 }) {
-  return <ConferenceBriefing />;
+  const { eventSlug } = await params;
+  const resolved = await resolveEventFromUrl(eventSlug);
+  const dbSlug = resolved?.slug ?? eventSlug;
+
+  const supabase = createServerClient();
+  const { data: eventRow } = await supabase
+    .from("events")
+    .select("event_config")
+    .eq("slug", dbSlug)
+    .maybeSingle();
+
+  const icps = getEventIcps(parseEventConfig(eventRow?.event_config), dbSlug);
+  const firstIcpId =
+    resolveActiveIcp(icps, null, null, getDefaultIcpId(dbSlug, icps)) ??
+    getDefaultIcpId(dbSlug, icps) ??
+    "investor";
+
+  return (
+    <ConferenceBriefing eventSlug={eventSlug} firstIcpId={firstIcpId} />
+  );
 }

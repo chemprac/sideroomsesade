@@ -7,8 +7,9 @@ import { MatchTable, getShortlist, matchesFilterChip } from "./MatchTable";
 import type { MatchFilterChip } from "./MatchTable";
 import { PaywallModal } from "./PaywallModal";
 import { PaywallBanner } from "./PaywallBanner";
-import { FREE_PREVIEW_ROWS } from "@/lib/paywall";
+import { FREE_PREVIEW_ROWS, isPaywallBypassed } from "@/lib/paywall";
 import type { MatchWithAttendee } from "@/lib/types";
+import type { ReactNode } from "react";
 
 type FilterChip = MatchFilterChip;
 
@@ -35,7 +36,12 @@ interface MatchListProps {
   initialMatches: MatchWithAttendee[];
   sessionId: string;
   paid: boolean;
+  paywallBypass?: boolean;
   totalAttendees: number;
+  headerSlot?: ReactNode;
+  icps?: { id: string; label: string }[];
+  activeIcp?: string;
+  initialSearchQuery?: string;
 }
 
 function matchesSearch(row: MatchWithAttendee, query: string): boolean {
@@ -52,19 +58,24 @@ export function MatchList({
   initialMatches,
   sessionId,
   paid: initialPaid,
+  paywallBypass: paywallBypassProp,
   totalAttendees,
+  headerSlot,
+  initialSearchQuery = "",
 }: MatchListProps) {
   const router = useRouter();
+  const bypass =
+    paywallBypassProp ?? isPaywallBypassed(eventSlug);
   const [matches] = useState(initialMatches);
-  const [paid, setPaid] = useState(initialPaid);
+  const [paid, setPaid] = useState(initialPaid || bypass);
   const [filterChip, setFilterChip] = useState<FilterChip>("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [shortlistIds, setShortlistIds] = useState<string[]>([]);
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [priceDisplay, setPriceDisplay] = useState("$8");
   const [paywallMessage, setPaywallMessage] = useState<string | null>(null);
 
-  const isUnlocked = paid;
+  const isUnlocked = paid || bypass;
 
   useEffect(() => {
     setShortlistIds(getShortlist(eventSlug));
@@ -142,9 +153,10 @@ export function MatchList({
   }, [eventSlug]);
 
   useEffect(() => {
+    if (bypass) return;
     const interval = setInterval(pollPaid, 5000);
     return () => clearInterval(interval);
-  }, [pollPaid]);
+  }, [pollPaid, bypass]);
 
   const handleRedeemSuccess = () => {
     setPaid(true);
@@ -184,6 +196,7 @@ export function MatchList({
     <>
       <Topbar eventSlug={eventSlug} />
       <div className="people-page">
+        {headerSlot}
         <div className="mobile-desktop-notice">Best viewed on desktop</div>
         <style>{`
           .mobile-desktop-notice {
@@ -276,9 +289,10 @@ export function MatchList({
           </h1>
           <p className="muted-text" style={{ marginTop: 6 }}>
             {sorted.length} people ranked for you
-            {!paid &&
+            {!isUnlocked &&
               lockedCount > 0 &&
               ` · Showing ${FREE_PREVIEW_ROWS} of ${totalAttendees}`}
+            {bypass && " · showing all"}
           </p>
           {isUnlocked && shortlistIds.length > 0 ? (
             <p
@@ -337,7 +351,7 @@ export function MatchList({
             >
               {emptyFilterMessage}
             </p>
-            {!paid ? (
+            {!isUnlocked ? (
               <div style={{ margin: "0 16px 16px" }}>
                 <PaywallBanner
                   totalCount={totalAttendees}
@@ -352,7 +366,7 @@ export function MatchList({
           <MatchTable
             rows={filtered}
             getRank={getRank}
-            paid={paid}
+            paid={paid || bypass}
             eventSlug={eventSlug}
             totalCount={totalAttendees}
             priceDisplay={priceDisplay}
@@ -365,14 +379,16 @@ export function MatchList({
         )}
       </div>
 
-      <PaywallModal
-        open={paywallOpen}
-        lockedCount={lockedCount}
-        sessionId={sessionId}
-        paywallMessage={paywallMessage}
-        onClose={() => setPaywallOpen(false)}
-        onUnlockSuccess={handleRedeemSuccess}
-      />
+      {!bypass ? (
+        <PaywallModal
+          open={paywallOpen}
+          lockedCount={lockedCount}
+          sessionId={sessionId}
+          paywallMessage={paywallMessage}
+          onClose={() => setPaywallOpen(false)}
+          onUnlockSuccess={handleRedeemSuccess}
+        />
+      ) : null}
 
     </>
   );

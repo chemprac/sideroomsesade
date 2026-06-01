@@ -11,3 +11,8 @@ export async function getIcpTypeFromCookie(): Promise<IcpType | null> {
   }
   return null;
 }
+
+/** Raw cookie value — used when event_config defines custom ICP ids. */
+export async function getIcpFromCookie(): Promise<string | null> {
+  return (await cookies()).get(ICP_TYPE_COOKIE)?.value ?? null;
+}
