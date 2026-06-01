@@ -1,4 +1,5 @@
 import ConferenceBriefing from "@/components/ConferenceBriefing";
+import DistinktIdentityWeekBriefing from "@/components/DistinktIdentityWeekBriefing";
 import { createServerClient } from "@/lib/supabase";
 import { resolveEventFromUrl } from "@/lib/events";
 import {
@@ -7,6 +8,7 @@ import {
   parseEventConfig,
   resolveActiveIcp,
 } from "@/lib/event-config";
+import { IDENTITY_WEEK_SLUG } from "@/lib/paywall";
 
 export default async function EventBriefingPage({
   params,
@@ -16,6 +18,11 @@ export default async function EventBriefingPage({
   const { eventSlug } = await params;
   const resolved = await resolveEventFromUrl(eventSlug);
   const dbSlug = resolved?.slug ?? eventSlug;
+  const urlSlug = resolved?.url_slug ?? eventSlug;
+
+  if (dbSlug === IDENTITY_WEEK_SLUG) {
+    return <DistinktIdentityWeekBriefing eventSlug={urlSlug} />;
+  }
 
   const supabase = createServerClient();
   const { data: eventRow } = await supabase
