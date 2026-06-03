@@ -15,20 +15,101 @@ function isWorkEmail(email: string): boolean {
   return !BLOCKED_DOMAINS.includes(base)
 }
 
-const PEOPLE = [
-  { x: 1,  scale: 0.74, tier: 'none',   bubble: null },
-  { x: 8,  scale: 0.82, tier: 'low',    bubble: null },
-  { x: 15, scale: 0.89, tier: 'medium', bubble: { text: 'Talked conference planning in a podcast', style: 'outline' } },
-  { x: 23, scale: 1.02, tier: 'high',   bubble: { text: 'Hiring in GTM', style: 'amber' } },
-  { x: 32, scale: 0.84, tier: 'low',    bubble: null },
-  { x: 40, scale: 1.06, tier: 'high',   bubble: { text: 'Just raised Series B', style: 'dark' } },
-  { x: 49, scale: 0.93, tier: 'medium', bubble: { text: 'Liked your post about AI in sales', style: 'outline' } },
-  { x: 57, scale: 1.0,  tier: 'high',   bubble: { text: 'Went to your university', style: 'dark' } },
-  { x: 65, scale: 0.87, tier: 'low',    bubble: null },
-  { x: 72, scale: 0.91, tier: 'none',   bubble: null },
-  { x: 79, scale: 1.0,  tier: 'medium', bubble: { text: 'CEO announced CSR push', style: 'amber' } },
-  { x: 87, scale: 0.80, tier: 'none',   bubble: null },
+type BubbleStyle = 'outline' | 'amber' | 'dark'
+type PersonTier = 'high' | 'medium' | 'low' | 'none'
+
+type Person = {
+  x: number
+  scale: number
+  tier: PersonTier
+  hasBubbleSlot: boolean
+}
+
+type ActiveBubble = {
+  personIndex: number
+  text: string
+  style: BubbleStyle
+}
+
+/** Signal bubbles — funding, hiring, career, LinkedIn, warm, news */
+const BUBBLE_MESSAGES: { text: string; style: BubbleStyle; tier: PersonTier }[] = [
+  // Funding
+  { text: 'Just raised Series B', style: 'dark', tier: 'high' },
+  { text: 'Backed 3 companies like yours', style: 'dark', tier: 'high' },
+  { text: 'Listed open to co-investment', style: 'amber', tier: 'high' },
+  { text: 'Seed round closed last month', style: 'dark', tier: 'high' },
+  // Hiring / growth
+  { text: 'Hiring in GTM', style: 'amber', tier: 'high' },
+  { text: 'Just posted Head of Sales role', style: 'amber', tier: 'medium' },
+  { text: 'Doubled headcount this quarter', style: 'amber', tier: 'medium' },
+  { text: 'Hiring in your exact market', style: 'amber', tier: 'high' },
+  // Career / background
+  { text: 'Exited your competitor last year', style: 'dark', tier: 'high' },
+  { text: 'Left Google 6 months ago to build', style: 'dark', tier: 'high' },
+  { text: 'Was VP Sales at your top client', style: 'dark', tier: 'high' },
+  { text: 'Founded 3 companies before this', style: 'dark', tier: 'medium' },
+  // LinkedIn activity
+  { text: 'Liked your post about AI in sales', style: 'outline', tier: 'medium' },
+  { text: 'Posts weekly about your problem', style: 'outline', tier: 'medium' },
+  { text: 'Commented on your industry thread', style: 'outline', tier: 'medium' },
+  { text: 'Follows your cofounder on LinkedIn', style: 'outline', tier: 'low' },
+  // Warm connections
+  { text: 'Went to your university', style: 'dark', tier: 'high' },
+  { text: 'Mutual: your lead investor', style: 'dark', tier: 'high' },
+  { text: 'Worked at your last company', style: 'dark', tier: 'high' },
+  { text: 'Knows your 3 closest colleagues', style: 'dark', tier: 'medium' },
+  // News / announcements
+  { text: 'CEO announced CSR push', style: 'amber', tier: 'medium' },
+  { text: 'Just announced a new partnership', style: 'outline', tier: 'medium' },
+  { text: 'Company entered your market', style: 'outline', tier: 'medium' },
+  { text: 'Spoke at this event 2 years ago', style: 'outline', tier: 'medium' },
 ]
+
+const CROWD_LAYOUT: { x: number; scale: number; tier: PersonTier; bubble: boolean }[] = [
+  { x: 2, scale: 0.74, tier: 'none', bubble: true },
+  { x: 6, scale: 0.82, tier: 'low', bubble: true },
+  { x: 10, scale: 0.89, tier: 'medium', bubble: true },
+  { x: 14, scale: 1.02, tier: 'high', bubble: true },
+  { x: 18, scale: 0.84, tier: 'low', bubble: true },
+  { x: 22, scale: 1.06, tier: 'high', bubble: true },
+  { x: 26, scale: 0.93, tier: 'medium', bubble: true },
+  { x: 30, scale: 1.0, tier: 'high', bubble: true },
+  { x: 34, scale: 0.87, tier: 'low', bubble: true },
+  { x: 38, scale: 0.91, tier: 'none', bubble: true },
+  { x: 42, scale: 1.0, tier: 'medium', bubble: true },
+  { x: 46, scale: 0.80, tier: 'none', bubble: true },
+  { x: 50, scale: 0.85, tier: 'low', bubble: true },
+  { x: 54, scale: 0.95, tier: 'medium', bubble: true },
+  { x: 58, scale: 1.04, tier: 'high', bubble: true },
+  { x: 62, scale: 0.88, tier: 'low', bubble: true },
+  { x: 66, scale: 0.92, tier: 'medium', bubble: true },
+  { x: 70, scale: 1.0, tier: 'high', bubble: true },
+  { x: 74, scale: 0.86, tier: 'low', bubble: true },
+  { x: 78, scale: 0.90, tier: 'medium', bubble: true },
+  { x: 82, scale: 1.02, tier: 'high', bubble: true },
+  { x: 86, scale: 0.83, tier: 'none', bubble: true },
+  { x: 90, scale: 0.96, tier: 'medium', bubble: true },
+  { x: 94, scale: 0.78, tier: 'none', bubble: true },
+  { x: 98, scale: 0.76, tier: 'none', bubble: false },
+]
+
+const PEOPLE: Person[] = CROWD_LAYOUT.map((slot) => ({
+  x: slot.x,
+  scale: slot.scale,
+  tier: slot.tier,
+  hasBubbleSlot: slot.bubble,
+}))
+
+const BUBBLE_SLOT_INDICES = PEOPLE.map((_, i) => i).filter((i) => PEOPLE[i].hasBubbleSlot)
+
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
 
 const TIER_COLORS: Record<string, string[]> = {
   high:   ['#2D6A4F', '#1B4332', '#40916C'],
@@ -41,13 +122,13 @@ function pickColor(tier: string, i: number) {
   return TIER_COLORS[tier][i % TIER_COLORS[tier].length]
 }
 
-const BUBBLE_INDICES = PEOPLE.map((p, i) => p.bubble ? i : -1).filter(i => i >= 0)
 const SHOW_DUR = 1800
 const GAP = 900
-const CYCLE = BUBBLE_INDICES.length * (SHOW_DUR + GAP) + 600
+const STEP = SHOW_DUR + GAP
+const CYCLE = BUBBLE_MESSAGES.length * STEP + 600
 
 export default function HomePage() {
-  const [visibleBubbles, setVisibleBubbles] = useState<Set<number>>(new Set())
+  const [activeBubble, setActiveBubble] = useState<ActiveBubble | null>(null)
   const [email, setEmail] = useState('')
   const [conference, setConference] = useState('')
   const [emailError, setEmailError] = useState('')
@@ -57,24 +138,58 @@ export default function HomePage() {
   const [submitted, setSubmitted] = useState(false)
 
   useEffect(() => {
+    let cancelled = false
+    const timeouts: ReturnType<typeof setTimeout>[] = []
+
     function runCycle() {
-      BUBBLE_INDICES.forEach((personIdx, order) => {
-        const showAt = order * (SHOW_DUR + GAP)
-        setTimeout(() => {
-          setVisibleBubbles(prev => new Set(prev).add(personIdx))
-        }, showAt)
-        setTimeout(() => {
-          setVisibleBubbles(prev => {
-            const next = new Set(prev)
-            next.delete(personIdx)
-            return next
-          })
-        }, showAt + SHOW_DUR)
+      timeouts.forEach(clearTimeout)
+      timeouts.length = 0
+
+      const slotOrder = shuffle(BUBBLE_SLOT_INDICES)
+      const messageOrder = shuffle(BUBBLE_MESSAGES.map((_, i) => i))
+      const count = Math.min(slotOrder.length, messageOrder.length)
+
+      messageOrder.slice(0, count).forEach((msgIdx, order) => {
+        const personIdx = slotOrder[order]
+        const msg = BUBBLE_MESSAGES[msgIdx]
+        const showAt = order * STEP
+
+        timeouts.push(
+          setTimeout(() => {
+            if (!cancelled) {
+              setActiveBubble({
+                personIndex: personIdx,
+                text: msg.text,
+                style: msg.style,
+              })
+            }
+          }, showAt)
+        )
+
+        timeouts.push(
+          setTimeout(() => {
+            if (!cancelled) {
+              setActiveBubble((prev) =>
+                prev?.personIndex === personIdx ? null : prev
+              )
+            }
+          }, showAt + SHOW_DUR)
+        )
       })
+
+      timeouts.push(
+        setTimeout(() => {
+          if (!cancelled) runCycle()
+        }, CYCLE)
+      )
     }
+
     runCycle()
-    const interval = setInterval(runCycle, CYCLE)
-    return () => clearInterval(interval)
+
+    return () => {
+      cancelled = true
+      timeouts.forEach(clearTimeout)
+    }
   }, [])
 
   async function handleSubmit() {
@@ -127,7 +242,7 @@ export default function HomePage() {
       </nav>
 
       {/* HERO */}
-      <section style={{ padding: '56px 40px 48px', textAlign: 'center', borderBottom: '1px solid #EDE5D0' }}>
+      <section style={{ padding: '56px 40px 48px', textAlign: 'center', borderBottom: '1px solid #EDE5D0', overflow: 'visible' }}>
         <p style={{ fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#8B7D5A', marginBottom: 14 }}>
           B2B conference intelligence &amp; management
         </p>
@@ -139,7 +254,7 @@ export default function HomePage() {
         </p>
 
         {/* CROWD */}
-        <div style={{ position: 'relative', height: 260, maxWidth: 720, margin: '0 auto' }}>
+        <div style={{ position: 'relative', height: 280, maxWidth: 960, margin: '0 auto', overflow: 'visible' }}>
           {PEOPLE.map((p, i) => {
             const color = pickColor(p.tier, i)
             const h = Math.round(120 * p.scale)
@@ -149,31 +264,36 @@ export default function HomePage() {
             const headCY = Math.round(14 * p.scale)
             const shoulderY = Math.round(30 * p.scale)
             const hipY = Math.round(72 * p.scale)
-            const isVisible = visibleBubbles.has(i)
+            const showing =
+              activeBubble !== null && activeBubble.personIndex === i
+            const bubble = showing ? activeBubble : null
 
             return (
-              <div key={i} style={{ position: 'absolute', bottom: 0, left: `${p.x}%`, display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: i === 5 ? 7 : i === 3 || i === 7 ? 6 : 4 }}>
-                {p.bubble && (
+              <div key={i} style={{ position: 'absolute', bottom: 0, left: `${p.x}%`, display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: showing ? 20 : 4 }}>
+                {bubble && (
                   <div style={{
                     position: 'absolute',
                     bottom: '100%',
                     left: '50%',
-                    transform: `translateX(-50%) translateY(${isVisible ? '-4px' : '6px'})`,
-                    opacity: isVisible ? 1 : 0,
+                    transform: `translateX(-50%) translateY(${showing ? '-4px' : '6px'})`,
+                    opacity: showing ? 1 : 0,
                     transition: 'opacity 0.4s ease, transform 0.4s ease',
                     fontFamily: 'DM Sans, sans-serif',
                     fontSize: 11,
                     fontWeight: 500,
                     padding: '6px 10px',
                     borderRadius: 3,
+                    width: 'max-content',
+                    maxWidth: 'none',
                     whiteSpace: 'nowrap',
+                    lineHeight: 1.2,
                     pointerEvents: 'none',
                     marginBottom: 6,
-                    background: p.bubble.style === 'dark' ? '#1C1208' : p.bubble.style === 'amber' ? '#C4842A' : '#F5F0E6',
-                    color: p.bubble.style === 'outline' ? '#1C1208' : '#F5F0E6',
-                    border: p.bubble.style === 'outline' ? '1px solid #C4B89A' : 'none',
+                    background: bubble.style === 'dark' ? '#1C1208' : bubble.style === 'amber' ? '#C4842A' : '#F5F0E6',
+                    color: bubble.style === 'outline' ? '#1C1208' : '#F5F0E6',
+                    border: bubble.style === 'outline' ? '1px solid #C4B89A' : 'none',
                   }}>
-                    {p.bubble.text}
+                    {bubble.text}
                     <span style={{
                       position: 'absolute',
                       top: '100%',
@@ -183,7 +303,7 @@ export default function HomePage() {
                       height: 0,
                       borderLeft: '5px solid transparent',
                       borderRight: '5px solid transparent',
-                      borderTop: `5px solid ${p.bubble.style === 'dark' ? '#1C1208' : p.bubble.style === 'amber' ? '#C4842A' : '#C4B89A'}`,
+                      borderTop: `5px solid ${bubble.style === 'dark' ? '#1C1208' : bubble.style === 'amber' ? '#C4842A' : '#C4B89A'}`,
                     }} />
                   </div>
                 )}
