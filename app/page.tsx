@@ -129,7 +129,7 @@ export default function HomePage() {
       {/* HERO */}
       <section style={{ padding: '56px 40px 48px', textAlign: 'center', borderBottom: '1px solid #EDE5D0' }}>
         <p style={{ fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#8B7D5A', marginBottom: 14 }}>
-          Attend smarter
+          B2B conference intelligence &amp; management
         </p>
         <h1 style={{ fontFamily: 'Playfair Display, serif', fontSize: 'clamp(26px, 4vw, 40px)', fontWeight: 600, color: '#1C1208', lineHeight: 1.25, marginBottom: 12 }}>
           You&apos;re about to walk into a room<br />of 4,000 people.
