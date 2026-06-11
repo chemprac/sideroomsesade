@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { SideroomLogo } from '@/components/SideroomLogo'
 
 const BLOCKED_DOMAINS = ['gmail','yahoo','hotmail','outlook','icloud','aol','protonmail','mail','ymail','googlemail','live','msn','me']
 function isWorkEmail(email: string) {
@@ -197,7 +198,7 @@ export default function HomePage() {
 
       {/* NAV */}
       <nav style={s({ borderBottom: `1px solid ${C.border}`, padding: '18px 40px' })}>
-        <span style={s({ fontFamily: 'Playfair Display, serif', fontSize: 20, fontWeight: 600, color: C.ink, letterSpacing: '-0.02em' })}>sideroom</span>
+        <SideroomLogo href="/" />
       </nav>
 
       {/* HERO */}
@@ -207,7 +208,7 @@ export default function HomePage() {
           You're about to walk into a room<br />of 4,000 people.
         </h1>
         <p style={s({ fontSize: 15, color: C.muted, lineHeight: 1.75, marginBottom: 44 })}>
-          Sideroom tells you exactly who matters —<br />and what matters to them — before you walk in.
+          Sideroom tells you exactly who matters, and what matters to them, before you walk in.
         </p>
 
         {/* CROWD STAGE */}
@@ -389,7 +390,7 @@ export default function HomePage() {
 
       {/* FOOTER */}
       <footer style={s({ borderTop: `1px solid ${C.border}`, padding: '20px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' })}>
-        <span style={s({ fontFamily: 'Playfair Display, serif', fontSize: 14, color: C.muted })}>sideroom</span>
+        <SideroomLogo href="/" muted />
         <span style={s({ fontSize: 11, color: C.border })}>© 2026 Sideroom. All rights reserved.</span>
       </footer>
 

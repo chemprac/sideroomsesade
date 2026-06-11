@@ -22,10 +22,30 @@ const dmMono = DM_Mono({
   variable: "--font-dm-mono",
 });
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
+  "https://www.sideroom.club";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "Sideroom — Find your people",
   description:
     "Conference people intelligence. Know who to meet before you arrive.",
+  openGraph: {
+    title: "Sideroom — Find your people",
+    description:
+      "Conference people intelligence. Know who to meet before you arrive.",
+    url: siteUrl,
+    siteName: "Sideroom",
+    locale: "en_GB",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Sideroom — Find your people",
+    description:
+      "Conference people intelligence. Know who to meet before you arrive.",
+  },
 };
 
 export default function RootLayout({
