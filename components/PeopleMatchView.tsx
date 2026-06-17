@@ -91,8 +91,7 @@ export function PeopleMatchView({
           Your matched people
         </h1>
         <p className="match-page-subtitle">
-          Ranked by company relevance · {totalEligible} attendees from priority
-          companies
+          Ranked by relevance · {totalEligible} attendees
         </p>
 
         <Suspense fallback={<div className="icp-switcher" style={{ minHeight: 88 }} />}>

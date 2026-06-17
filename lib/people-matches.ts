@@ -90,30 +90,53 @@ function normalizeSpeakerName(name: string): string {
   return name.trim().toLowerCase();
 }
 
+function relevanceScoreForAttendee(
+  attendeeId: string,
+  companyName: string | null,
+  companyByName: Map<string, CompanyProfileRow>,
+  matchScoreByAttendee: Map<string, number>,
+  icp: string
+): number {
+  const companyScore =
+    companyName && companyByName.has(companyName)
+      ? icpScore(companyByName.get(companyName)!.icp_scores as Record<string, unknown> | null, icp)
+      : 0;
+  const matchScore = matchScoreByAttendee.get(attendeeId) ?? 0;
+  return Math.max(companyScore, matchScore);
+}
+
 export async function fetchPeopleMatches(
   supabase: SupabaseClient,
   eventSlug: string,
   icp: string,
   companyFilter?: string | null
 ): Promise<{ people: PersonMatchRow[]; totalEligible: number }> {
-  const [{ data: companyRows, error: companyError }, { data: attendeeRows, error: attendeeError }] =
-    await Promise.all([
-      supabase
-        .from("company_profiles")
-        .select("company_name, icp_scores, review_status, company_type, competitor_signal")
-        .eq("event_slug", eventSlug)
-        .eq("review_status", "approved"),
-      supabase
-        .from("attendees")
-        .select(
-          "id, name, title, company, city, country, linkedin_url, attendee_profiles(approach_intel, seniority, is_speaker, profile)"
-        )
-        .eq("event_slug", eventSlug)
-        .eq("enrichment_tier", "priority"),
-    ]);
+  const [
+    { data: companyRows, error: companyError },
+    { data: attendeeRows, error: attendeeError },
+    { data: matchRows, error: matchError },
+  ] = await Promise.all([
+    supabase
+      .from("company_profiles")
+      .select("company_name, icp_scores, review_status, company_type, competitor_signal")
+      .eq("event_slug", eventSlug)
+      .eq("review_status", "approved"),
+    supabase
+      .from("attendees")
+      .select(
+        "id, name, title, company, city, country, linkedin_url, attendee_profiles(approach_intel, seniority, is_speaker, profile)"
+      )
+      .eq("event_slug", eventSlug),
+    supabase
+      .from("event_icp_matches")
+      .select("attendee_id, score")
+      .eq("event_slug", eventSlug)
+      .eq("icp_type", icp),
+  ]);
 
   if (companyError) throw new Error(companyError.message);
   if (attendeeError) throw new Error(attendeeError.message);
+  if (matchError) throw new Error(matchError.message);
 
   const companyByName = new Map<string, CompanyProfileRow>();
   for (const row of companyRows ?? []) {
@@ -122,11 +145,14 @@ export async function fetchPeopleMatches(
     companyByName.set(profile.company_name, profile);
   }
 
-  let eligible = (attendeeRows ?? []).filter((row) => {
-    const company = row.company as string | null;
-    return company && companyByName.has(company);
-  });
+  const matchScoreByAttendee = new Map<string, number>();
+  for (const row of matchRows ?? []) {
+    const attendeeId = row.attendee_id as string;
+    const score = row.score as number;
+    if (attendeeId) matchScoreByAttendee.set(attendeeId, score);
+  }
 
+  let eligible = attendeeRows ?? [];
   const totalEligible = eligible.length;
 
   if (companyFilter?.trim()) {
@@ -157,8 +183,7 @@ export async function fetchPeopleMatches(
   }
 
   const people: PersonMatchRow[] = eligible.map((row) => {
-    const companyName = row.company as string;
-    const companyProfile = companyByName.get(companyName)!;
+    const companyName = (row.company as string | null) ?? null;
     const profileRaw = Array.isArray(row.attendee_profiles)
       ? row.attendee_profiles[0]
       : (row.attendee_profiles as Record<string, unknown> | null);
@@ -189,7 +214,13 @@ export async function fetchPeopleMatches(
       is_speaker: isSpeaker,
       session_time: speaker?.session_time ?? null,
       session_day: speaker?.session_day ?? null,
-      company_score: icpScore(companyProfile.icp_scores as Record<string, unknown> | null, icp),
+      company_score: relevanceScoreForAttendee(
+        row.id as string,
+        companyName,
+        companyByName,
+        matchScoreByAttendee,
+        icp
+      ),
       approach_intel: approachIntel,
       seniority,
     };
@@ -199,11 +230,14 @@ export async function fetchPeopleMatches(
     if (b.company_score !== a.company_score) {
       return b.company_score - a.company_score;
     }
-    if (a.company !== b.company) {
-      return (a.company ?? "").localeCompare(b.company ?? "");
+    if (a.is_speaker !== b.is_speaker) {
+      return a.is_speaker ? -1 : 1;
     }
     const sr = seniorityRank(a.seniority) - seniorityRank(b.seniority);
     if (sr !== 0) return sr;
+    if (a.company !== b.company) {
+      return (a.company ?? "").localeCompare(b.company ?? "");
+    }
     return a.name.localeCompare(b.name);
   });
 
