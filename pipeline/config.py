@@ -11,7 +11,10 @@ OPENROUTER_API_KEY = os.environ["OPENROUTER_API_KEY"]
 TAVILY_API_KEY = os.environ["TAVILY_API_KEY"]
 APIFY_API_TOKEN = os.environ["APIFY_API_TOKEN"]
 
-GEMINI_MODEL = "google/gemini-2.0-flash-001"
+GEMINI_MODEL = os.getenv(
+    "PIPELINE_GEMINI_MODEL",
+    os.getenv("OUTREACH_GEMINI_MODEL", "google/gemini-2.5-flash"),
+)
 MAX_WEBSITE_PAGES = 8
 MAX_CRAWL_DEPTH = 2
 MAX_LINKEDIN_POSTS = 15

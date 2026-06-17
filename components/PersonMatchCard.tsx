@@ -59,7 +59,10 @@ export function PersonMatchCard({ person, rank }: PersonMatchCardProps) {
   const hasProfile = Boolean(intel);
   const [expanded, setExpanded] = useState(false);
 
-  const relevance = intel?.relevance_to_distinkt?.trim() ?? "";
+  const relevance =
+    intel?.relevance_to_client?.trim() ??
+    intel?.relevance_to_distinkt?.trim() ??
+    "";
   const talkingPoints = (intel?.talking_points ?? []).filter(
     (p): p is string => typeof p === "string" && p.trim().length > 0
   );

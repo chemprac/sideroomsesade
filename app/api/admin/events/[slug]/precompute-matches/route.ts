@@ -2,15 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSecret, unauthorizedResponse } from "@/lib/admin-auth";
 import {
   countEventIcpMatches,
-  ICP_TYPES,
   upsertEventIcpMatches,
 } from "@/lib/event-icp-matches";
+import { getEventIcps, parseEventConfig } from "@/lib/event-config";
 import { scoreAttendeesForIcp } from "@/lib/match-engine";
 import { createServerClient } from "@/lib/supabase";
 import type { AttendeeWithProfile, IcpType } from "@/lib/types";
 
 /**
- * Pre-score attendees for one or all four ICPs (no per-user context).
+ * Pre-score attendees for one or all configured ICPs (no per-user context).
  * Run once per event after enrichment; users then get instant lists.
  */
 export async function POST(
@@ -24,11 +24,33 @@ export async function POST(
   const force = body.force === true;
   const icpFilter = body.icpType as IcpType | undefined;
 
-  if (icpFilter && !ICP_TYPES.includes(icpFilter)) {
-    return NextResponse.json({ error: "Invalid icpType" }, { status: 400 });
+  const supabase = createServerClient();
+
+  const { data: eventRow, error: eventError } = await supabase
+    .from("events")
+    .select("event_config")
+    .eq("slug", slug)
+    .single();
+
+  if (eventError || !eventRow) {
+    return NextResponse.json({ error: "Event not found" }, { status: 404 });
   }
 
-  const supabase = createServerClient();
+  const icpTypes = getEventIcps(
+    parseEventConfig(eventRow.event_config),
+    slug
+  ).map((icp) => icp.id as IcpType);
+
+  if (!icpTypes.length) {
+    return NextResponse.json(
+      { error: "No ICP types configured for event" },
+      { status: 400 }
+    );
+  }
+
+  if (icpFilter && !icpTypes.includes(icpFilter)) {
+    return NextResponse.json({ error: "Invalid icpType" }, { status: 400 });
+  }
 
   const { data: attendees } = await supabase
     .from("attendees")
@@ -42,7 +64,7 @@ export async function POST(
   }
 
   const attendeeList = attendees as AttendeeWithProfile[];
-  const icpTypes = icpFilter ? [icpFilter] : ICP_TYPES;
+  const selectedIcpTypes = icpFilter ? [icpFilter] : icpTypes;
   const results: Array<{
     icpType: IcpType;
     matched: number;
@@ -50,7 +72,7 @@ export async function POST(
     skipped?: boolean;
   }> = [];
 
-  for (const icpType of icpTypes) {
+  for (const icpType of selectedIcpTypes) {
     if (!force) {
       const existing = await countEventIcpMatches(supabase, slug, icpType);
       if (existing > 0) {

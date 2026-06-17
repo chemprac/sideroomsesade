@@ -72,11 +72,13 @@ def load_required_env() -> tuple[str, str, str, str, str]:
     )
 
 
-def get_companies_to_enrich(supabase: Client) -> list[dict[str, str]]:
+def get_companies_to_enrich(
+    supabase: Client, event_slug: str
+) -> list[dict[str, str]]:
     response = (
         supabase.table("company_profiles")
         .select("company_name, linkedin_url")
-        .eq("event_slug", EVENT_SLUG)
+        .eq("event_slug", event_slug)
         .not_.is_("linkedin_url", "null")
         .is_("profile", "null")
         .execute()
@@ -309,7 +311,7 @@ def synthesize_profile(
 
 
 def update_company_profile(
-    supabase: Client, company_name: str, profile: dict[str, Any]
+    supabase: Client, event_slug: str, company_name: str, profile: dict[str, Any]
 ) -> None:
     (
         supabase.table("company_profiles")
@@ -320,7 +322,7 @@ def update_company_profile(
             }
         )
         .eq("company_name", company_name)
-        .eq("event_slug", EVENT_SLUG)
+        .eq("event_slug", event_slug)
         .execute()
     )
 
@@ -346,6 +348,11 @@ def main() -> None:
         default=None,
         help="Only enrich these company_name values (space-separated).",
     )
+    parser.add_argument(
+        "--event-slug",
+        default=EVENT_SLUG,
+        help=f"Event slug to process (default: {EVENT_SLUG})",
+    )
     args = parser.parse_args()
 
     (
@@ -361,7 +368,7 @@ def main() -> None:
     )
     print(f"OpenRouter model: {openrouter_model}", flush=True)
 
-    companies = get_companies_to_enrich(supabase)
+    companies = get_companies_to_enrich(supabase, args.event_slug)
     total_pending = len(companies)
     if args.only:
         wanted = {c.casefold().strip(): c for c in args.only if c and c.strip()}
@@ -370,7 +377,7 @@ def main() -> None:
         companies = companies[: args.limit]
 
     print(
-        f"Processing {len(companies)} of {total_pending} pending companies for {EVENT_SLUG}",
+        f"Processing {len(companies)} of {total_pending} pending companies for {args.event_slug}",
         flush=True,
     )
 
@@ -398,7 +405,7 @@ def main() -> None:
                 openrouter_api_key,
                 openrouter_model,
             )
-            update_company_profile(supabase, company_name, profile)
+            update_company_profile(supabase, args.event_slug, company_name, profile)
             enriched += 1
 
             if apify_empty:

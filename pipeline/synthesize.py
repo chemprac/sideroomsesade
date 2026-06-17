@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import json
 
-from pipeline.brief import DISTINKT_BRIEF, ICP_DEFINITIONS
 from pipeline.gemini import call_gemini, parse_gemini_json
 
 
@@ -10,12 +11,36 @@ def synthesise_profile(
     news_summary: str,
     linkedin_summary: str,
     *,
+    client_context: dict | None = None,
+    icp_definitions: list[dict] | None = None,
     signals_only: bool = False,
 ) -> dict:
     name = company["company_name"]
     print(f"    [gemini] Synthesising {name}...")
 
-    icp_text = "\n".join([f'- "{k}": {v}' for k, v in ICP_DEFINITIONS.items()])
+    client = client_context or {}
+    client_name = client.get("name") or "the client"
+    client_role = client.get("role") or "conference attendee"
+    client_background = client.get("background") or "Not available"
+    client_goal = client.get("looking_for") or "relevant business conversations"
+    icps = icp_definitions or []
+    icp_ids = [icp.get("id") for icp in icps if icp.get("id")]
+    icp_text = "\n".join(
+        [
+            f'- "{icp.get("id")}": {icp.get("label") or icp.get("id")} — '
+            f'{icp.get("description") or "; ".join(icp.get("signals") or [])}'
+            for icp in icps
+            if icp.get("id")
+        ]
+    )
+    if not icp_text:
+        icp_text = '- "fit": General fit for the client goal'
+        icp_ids = ["fit"]
+    score_schema = ",\n    ".join([f'"{icp_id}": 0' for icp_id in icp_ids])
+    keyed_string_schema = ",\n    ".join(
+        [f'"{icp_id}": "Same format"' for icp_id in icp_ids]
+    )
+    company_types = ", ".join([*icp_ids, "competitor", "uncertain"])
     known_data = ""
     if company.get("headcount_band"):
         known_data += f"\nKnown headcount band: {company['headcount_band']}"
@@ -29,10 +54,13 @@ def synthesise_profile(
     else:
         website_block = f"WEBSITE SUMMARY:\n{website_summary or 'Not available'}"
 
-    prompt = f"""You are an expert business analyst preparing company intelligence for Distinkt's team at Identity Week Europe 2026.
+    prompt = f"""You are an expert business analyst preparing company intelligence for {client_name} at this event.
 
-DISTINKT BACKGROUND:
-{DISTINKT_BRIEF}
+CLIENT CONTEXT:
+Name: {client_name}
+Role: {client_role}
+Background: {client_background}
+Looking for: {client_goal}
 
 ICP TYPES TO ASSESS:
 {icp_text}
@@ -58,31 +86,22 @@ Return ONLY valid JSON — no markdown, no preamble:
   "momentum": "one of: high, medium, low — based on recent activity, hiring, news",
 
   "hook": {{
-    "integration_partner": "One sharp sentence max 20 words. Specific to this company. Never generic.",
-    "channel_partner": "Same format",
-    "investor": "Same format",
-    "pilot_customer": "Same format"
+    {keyed_string_schema}
   }},
 
   "why_this_match": {{
-    "integration_partner": "2-3 concrete sentences on why valuable to Distinkt as integration partner.",
-    "channel_partner": "Same format",
-    "investor": "Same format",
-    "pilot_customer": "Same format"
+    {keyed_string_schema}
   }},
 
   "conversation_hook": {{
-    "integration_partner": "Specific opening question referencing something real about this company.",
-    "channel_partner": "Same format",
-    "investor": "Same format",
-    "pilot_customer": "Same format"
+    {keyed_string_schema}
   }},
 
   "proof_points": [
     {{
       "date": "Month Year",
       "headline": "Specific recent development from news or LinkedIn summaries only",
-      "relevance": "Why this matters specifically for Distinkt"
+      "relevance": "Why this matters specifically for {client_name}"
     }}
   ],
 
@@ -93,18 +112,15 @@ Return ONLY valid JSON — no markdown, no preamble:
   }},
 
   "icp_scores": {{
-    "integration_partner": 0,
-    "channel_partner": 0,
-    "investor": 0,
-    "pilot_customer": 0
+    {score_schema}
   }},
 
-  "company_type": "one of: integration_partner, channel_partner, pilot_customer, competitor, investor, uncertain",
+  "company_type": "one of: {company_types}",
 
   "competitor_signal": {{
     "is_competitor": false,
     "confidence": "high",
-    "reason": "Clear explanation of whether they compete with Distinkt's security pigment product"
+    "reason": "Clear explanation of whether they compete with {client_name}'s advisory/fractional CMO work"
   }},
 
   "review_status": "approved",
@@ -118,8 +134,11 @@ RULES:
 4. When website is unavailable, infer what_they_do from news/LinkedIn only — be conservative; lower icp_scores if evidence is thin.
 5. proof_points from summaries only — return [] if nothing specific found.
 6. hook sentences must be specific — never "great potential partner".
-7. is_competitor = true only if they make NIR/UV security pigments or covert security inks.
-8. Escape backslashes and quotes properly in JSON strings."""
+7. Score companies for {client_name}'s stated goal, not for physical authentication, security pigments, pharma, luxury, or Identity Week.
+8. Do not mention Distinkt, Sotheby's, Philip Morris, physical authentication, security pigments, pharma, or luxury unless they appear in the company source summaries.
+9. is_competitor = true only if they directly compete with {client_name}'s senior fintech marketing advisory/fractional CMO work.
+10. Write conversation_hook values as ready-to-say questions from {client_name} to someone at the company. Do not start with "{client_name}," or refer to {client_name} in the third person.
+11. Escape backslashes and quotes properly in JSON strings."""
 
     try:
         raw = call_gemini(prompt, max_tokens=4000)
@@ -140,7 +159,7 @@ RULES:
 
         print(
             f"    [gemini] Type: {result.get('company_type')} | "
-            f"Integration: {icp.get('integration_partner', 0)}"
+            f"Top score: {max([int(v or 0) for v in icp.values()] or [0])}"
             + (" | signals-only" if signals_only else "")
         )
         return result

@@ -5,6 +5,7 @@ import { ProgressLog } from "../ProgressLog";
 import { adminFetch } from "@/lib/admin-client";
 import { parseCsvContent } from "@/lib/csv-attendees";
 import { parseSpeakersCsv } from "@/lib/csv-speakers";
+import { getEventIcps, parseEventConfig } from "@/lib/event-config";
 import type { Event } from "@/lib/types";
 
 const CSV_CHUNK = 25;
@@ -128,7 +129,12 @@ export function SetupTab({
   const ev = event as Event & {
     url_slug?: string;
     status?: string;
+    event_config?: unknown;
   };
+  const configuredIcps = getEventIcps(
+    parseEventConfig(ev.event_config),
+    ev.slug
+  );
 
   return (
     <div>
@@ -271,10 +277,10 @@ export function SetupTab({
       <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "28px 0" }} />
 
       <h2 className="font-heading" style={{ fontSize: 20, marginBottom: 8 }}>
-        Match lists (4 goals)
+        Match lists
       </h2>
       <p className="muted-text" style={{ marginBottom: 12, fontSize: 13 }}>
-        Score every attendee once per goal (investor, sales, partners, job).
+        Score every attendee once per configured goal.
         After this, users with no custom goal text get instant lists — no wait
         on open.
       </p>
@@ -285,43 +291,51 @@ export function SetupTab({
         onClick={async () => {
           setBusy(true);
           clearLog();
-          const goals = [
-            ["investor", "Looking for founders"],
-            ["sales", "Looking for clients"],
-            ["partners", "Looking for partners"],
-            ["job", "Looking for a job"],
-          ] as const;
           appendLog(["— Precomputing match lists…"]);
-          for (const [icpType, label] of goals) {
-            appendLog([`— ${label} (${icpType})…`]);
-            const res = await adminFetch(
-              secret,
-              `/api/admin/events/${eventSlug}/precompute-matches`,
-              {
-                method: "POST",
-                body: JSON.stringify({ icpType, force: false }),
-              }
-            );
-            const data = await res.json();
-            if (!res.ok) {
-              appendLog([`✗ ${icpType}: ${data.error ?? "failed"}`]);
-              continue;
+          const res = await adminFetch(
+            secret,
+            `/api/admin/events/${eventSlug}/precompute-matches`,
+            {
+              method: "POST",
+              body: JSON.stringify({ force: false }),
             }
-            const row = data.results?.[0];
-            if (row?.skipped) {
-              appendLog([`✓ ${icpType}: ${row.matched} cached`]);
-            } else {
-              appendLog([
-                `✓ ${icpType}: ${row?.matched ?? 0} scored (${row?.source ?? "?"})`,
-              ]);
+          );
+          const data = await res.json();
+          if (!res.ok) {
+            appendLog([`✗ ${data.error ?? "failed"}`]);
+          } else {
+            for (const row of data.results ?? []) {
+              const icpType = row.icpType ?? "unknown";
+              if (row?.skipped) {
+                appendLog([`✓ ${icpType}: ${row.matched} cached`]);
+              } else {
+                appendLog([
+                  `✓ ${icpType}: ${row?.matched ?? 0} scored (${row?.source ?? "?"})`,
+                ]);
+              }
             }
           }
           appendLog(["— Done"]);
           setBusy(false);
         }}
       >
-        Precompute all 4 match lists
+        Precompute match lists
       </button>
+
+      <div style={{ marginTop: 12, marginBottom: 16 }}>
+        <p className="font-mono-label">Configured ICPs</p>
+        {configuredIcps.length ? (
+          <ul style={{ margin: "8px 0 0 18px", color: "var(--ink)" }}>
+            {configuredIcps.map((icp) => (
+              <li key={icp.id}>{icp.label}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted-text" style={{ marginTop: 8, fontSize: 13 }}>
+            No ICPs configured.
+          </p>
+        )}
+      </div>
 
       <ProgressLog lines={log} />
     </div>

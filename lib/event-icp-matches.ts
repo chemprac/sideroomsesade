@@ -5,8 +5,6 @@ import type { IcpType } from "@/lib/types";
 
 type SupabaseClient = ReturnType<typeof createServerClient>;
 
-export const ICP_TYPES: IcpType[] = ["investor", "sales", "partners", "job"];
-
 const INSERT_CHUNK = 200;
 
 export async function countEventIcpMatches(

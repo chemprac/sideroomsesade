@@ -66,6 +66,21 @@ def fetch_speaker_info(supabase, event_slug: str, name: str) -> dict | None:
     return rows[0] if rows else None
 
 
+def fetch_client_context(supabase, event_slug: str) -> dict:
+    result = (
+        supabase.table("events")
+        .select("event_config")
+        .eq("slug", event_slug)
+        .maybe_single()
+        .execute()
+    )
+    config = (result.data or {}).get("event_config") or {}
+    if not isinstance(config, dict):
+        return {}
+    user_context = config.get("user_context")
+    return user_context if isinstance(user_context, dict) else {}
+
+
 def main():
     opts = parse_attendee_pipeline_args()
     event_slug = opts["event_slug"] or EVENT_SLUG_DEFAULT
@@ -73,6 +88,8 @@ def main():
 
     if not attendee_pipeline_columns_available(supabase):
         return
+
+    client_context = fetch_client_context(supabase, event_slug)
 
     print("=" * 60)
     print("Synthesize Attendee Profiles")
@@ -116,6 +133,7 @@ def main():
                 title=attendee.get("title"),
                 company=attendee.get("company"),
                 company_context=company_ctx,
+                client_context=client_context,
                 linkedin_profile_summary=row.get("linkedin_profile_summary"),
                 linkedin_posts_summary=row.get("linkedin_posts_summary"),
                 news_summary=row.get("news_summary"),

@@ -1,4 +1,4 @@
-/** ICP tab definition stored in events.event_config.icps */
+/** ICP tab definition stored in events.event_config.icp_definitions */
 export type EventIcpDefinition = {
   id: string;
   label: string;
@@ -6,53 +6,54 @@ export type EventIcpDefinition = {
 };
 
 export type EventConfig = {
+  icp_definitions?: EventIcpDefinition[];
+  /** Legacy config key; use icp_definitions for new events. */
   icps?: EventIcpDefinition[];
 };
 
-const ESADE_FALLBACK_ICPS: EventIcpDefinition[] = [
-  { id: "investor", label: "Investors", emoji: "💰" },
-  { id: "sales", label: "Sales", emoji: "🎯" },
-  { id: "partners", label: "Partners", emoji: "🤝" },
-  { id: "job", label: "Job Seekers", emoji: "💼" },
-];
+function parseIcpDefinitions(raw: unknown): EventIcpDefinition[] | undefined {
+  const items = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === "object"
+      ? Object.entries(raw).map(([id, value]) =>
+          value && typeof value === "object" ? { ...value, id } : null
+        )
+      : null;
 
-const IDENTITY_WEEK_FALLBACK_ICPS: EventIcpDefinition[] = [
-  { id: "pilot_customer", label: "Pilot Customers", emoji: "🧪" },
-  { id: "integration_partner", label: "Integration Partners", emoji: "🔗" },
-  { id: "channel_partner", label: "Channel Partners", emoji: "🤝" },
-  { id: "investor", label: "Investors", emoji: "💰" },
-];
+  if (!items) return undefined;
 
-/** Default ICP tab when no ?icp= query or cookie is set. */
-const DEFAULT_ICP_BY_EVENT: Record<string, string> = {
-  "identity-week-2026": "pilot_customer",
-};
+  const definitions = items.filter(
+    (i): i is EventIcpDefinition =>
+      !!i &&
+      typeof i === "object" &&
+      typeof (i as EventIcpDefinition).id === "string" &&
+      typeof (i as EventIcpDefinition).label === "string"
+  );
+  return definitions.length ? definitions : undefined;
+}
 
 export function parseEventConfig(raw: unknown): EventConfig {
   if (!raw || typeof raw !== "object") return {};
-  const icps = (raw as EventConfig).icps;
-  if (!Array.isArray(icps)) return {};
+  const config = raw as EventConfig;
+  const icpDefinitions = parseIcpDefinitions(config.icp_definitions);
+  const legacyIcps = parseIcpDefinitions(config.icps);
+
   return {
-    icps: icps.filter(
-      (i): i is EventIcpDefinition =>
-        !!i &&
-        typeof i === "object" &&
-        typeof (i as EventIcpDefinition).id === "string" &&
-        typeof (i as EventIcpDefinition).label === "string"
-    ),
+    ...(icpDefinitions ? { icp_definitions: icpDefinitions } : {}),
+    ...(legacyIcps ? { icps: legacyIcps } : {}),
   };
 }
 
-/** ICPs from DB event_config; ESADE fallback only when config is empty. */
+/** ICPs from DB event_config; no hardcoded event fallbacks. */
 export function getEventIcps(
   eventConfig: EventConfig | null | undefined,
   eventSlug?: string
 ): EventIcpDefinition[] {
+  if (eventConfig?.icp_definitions?.length) return eventConfig.icp_definitions;
   if (eventConfig?.icps?.length) return eventConfig.icps;
-  if (eventSlug === "identity-week-2026") return IDENTITY_WEEK_FALLBACK_ICPS;
-  if (eventSlug === "esade-2026" || eventSlug === "esade") {
-    return ESADE_FALLBACK_ICPS;
-  }
+  console.warn(
+    `[event-config] Missing ICP definitions in event_config${eventSlug ? ` for ${eventSlug}` : ""}`
+  );
   return [];
 }
 
@@ -61,8 +62,6 @@ export function getDefaultIcpId(
   icps: EventIcpDefinition[]
 ): string | null {
   if (!icps.length) return null;
-  const preferred = eventSlug ? DEFAULT_ICP_BY_EVENT[eventSlug] : undefined;
-  if (preferred && icps.some((i) => i.id === preferred)) return preferred;
   return icps[0].id;
 }
 

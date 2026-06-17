@@ -66,7 +66,7 @@ export function generateFallbackMatches(
     .split(/\W+/)
     .filter((w) => w.length > 3);
 
-  const keywords = ICP_KEYWORDS[icpType];
+  const keywords = ICP_KEYWORDS[icpType] ?? contextWords;
 
   const scored = attendees.map((a) => {
     const text = buildAttendeeText(a, icpType);
@@ -153,14 +153,17 @@ function buildMatchReason(
       : `${role} at ${co} — hiring signal relevant to your search${ctx}`;
   }
 
-  const reasons: Record<IcpType, string> = {
+  const reasons: Record<string, string> = {
     investor: `${role} at ${co} — building something worth a conversation for angel/seed investors${ctx}`,
     sales: `${role} at ${co} — potential buyer or champion for B2B outreach${ctx}`,
     partners: `${role} at ${co} — strong fit for strategic partnership conversations${ctx}`,
     job: `${role} at ${co} — limited hiring signal; review narrative before reaching out${ctx}`,
   };
 
-  return reasons[icpType];
+  return (
+    reasons[icpType] ??
+    `${role} at ${co} — potential fit for this configured ICP${ctx}`
+  );
 }
 
 function buildTags(a: Attendee, icpType: IcpType, score: number): string[] {

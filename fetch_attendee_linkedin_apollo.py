@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Fetch LinkedIn URLs for Identity Week priority attendees via Apollo, with Tavily fallback.
+Fetch LinkedIn URLs for priority attendees via Apollo, with Tavily fallback.
 
-  python3 fetch_attendee_linkedin_apollo.py
-  python3 fetch_attendee_linkedin_apollo.py --test
-  python3 fetch_attendee_linkedin_apollo.py --company "IN Groupe"
+  python3 fetch_attendee_linkedin_apollo.py --event identity-week-2026
+  python3 fetch_attendee_linkedin_apollo.py --event identity-week-2026 --test
+  python3 fetch_attendee_linkedin_apollo.py --event identity-week-2026 --company "IN Groupe"
 """
 
 from __future__ import annotations
@@ -20,7 +20,6 @@ import requests
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
-EVENT_SLUG = "identity-week-2026"
 APOLLO_LEGACY_SEARCH_URL = "https://api.apollo.io/v1/people/search"
 APOLLO_API_SEARCH_URL = "https://api.apollo.io/api/v1/mixed_people/api_search"
 APOLLO_MATCH_URL = "https://api.apollo.io/v1/people/match"
@@ -133,6 +132,19 @@ def company_keyword_in_text(company: str, text: str) -> bool:
         return False
     haystack = text.lower()
     return any(kw in haystack for kw in keywords)
+
+
+def name_keywords(name: str) -> list[str]:
+    tokens = re.findall(r"[a-z0-9]+", name.lower())
+    return [token for token in tokens if len(token) > 2]
+
+
+def name_keyword_in_text(name: str, text: str) -> bool:
+    keywords = name_keywords(name)
+    if not keywords:
+        return False
+    haystack = text.lower()
+    return all(kw in haystack for kw in keywords)
 
 
 def apollo_accept_match(
@@ -320,40 +332,52 @@ def tavily_find_linkedin(
     company: str,
     tavily_api_key: str,
 ) -> str | None:
-    query = f'"{name}" "{company}" site:linkedin.com/in'
-    response = requests.post(
-        TAVILY_SEARCH_URL,
-        json={
-            "api_key": tavily_api_key,
-            "query": query,
-            "search_depth": "basic",
-            "max_results": 5,
-            "include_raw_content": False,
-        },
-        timeout=REQUEST_TIMEOUT_SECONDS,
-    )
-    if not response.ok:
-        return None
+    queries = [
+        (f'"{name}" "{company}" site:linkedin.com/in', "company"),
+        (f'"{name}" fintech site:linkedin.com/in', "name"),
+        (f'"{name}" fintech london site:linkedin.com/in', "name"),
+    ]
 
-    results = response.json().get("results") or []
-    for item in results:
-        if not isinstance(item, dict):
-            continue
-        title = (item.get("title") or "").strip()
-        snippet = (item.get("content") or "").strip()
-        combined = f"{title} {snippet}"
-
-        if not company_keyword_in_text(company, combined):
+    for query, validation in queries:
+        if validation == "company" and not company:
             continue
 
-        url = item.get("url")
-        linkedin_url = None
-        if isinstance(url, str):
-            linkedin_url = find_linkedin_in_text(url)
-        if not linkedin_url:
-            linkedin_url = find_linkedin_in_text(combined)
-        if linkedin_url:
-            return linkedin_url
+        response = requests.post(
+            TAVILY_SEARCH_URL,
+            json={
+                "api_key": tavily_api_key,
+                "query": query,
+                "search_depth": "basic",
+                "max_results": 5,
+                "include_raw_content": False,
+            },
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        if not response.ok:
+            continue
+
+        results = response.json().get("results") or []
+        for item in results:
+            if not isinstance(item, dict):
+                continue
+            title = (item.get("title") or "").strip()
+            snippet = (item.get("content") or "").strip()
+            combined = f"{title} {snippet}"
+
+            if validation == "company":
+                if not company_keyword_in_text(company, combined):
+                    continue
+            elif not name_keyword_in_text(name, combined):
+                continue
+
+            url = item.get("url")
+            linkedin_url = None
+            if isinstance(url, str):
+                linkedin_url = find_linkedin_in_text(url)
+            if not linkedin_url:
+                linkedin_url = find_linkedin_in_text(combined)
+            if linkedin_url:
+                return linkedin_url
 
     return None
 
@@ -361,13 +385,14 @@ def tavily_find_linkedin(
 def load_attendees(
     supabase: Client,
     *,
+    event_slug: str,
     company: str | None,
     test: bool,
 ) -> list[dict[str, Any]]:
     query = (
         supabase.table("attendees")
         .select("id, name, first_name, last_name, company, email, title, linkedin_url, raw_apollo")
-        .eq("event_slug", EVENT_SLUG)
+        .eq("event_slug", event_slug)
         .eq("enrichment_tier", "priority")
         .is_("linkedin_url", "null")
         .order("company")
@@ -474,6 +499,12 @@ def main() -> None:
         description="Fetch attendee LinkedIn URLs via Apollo with Tavily fallback."
     )
     parser.add_argument(
+        "--event",
+        dest="event_slug",
+        required=True,
+        help="Event slug to process",
+    )
+    parser.add_argument(
         "--test",
         action="store_true",
         help="Process only the first 10 matching attendees",
@@ -487,10 +518,15 @@ def main() -> None:
     supabase_url, service_role_key, apollo_api_key, tavily_api_key = load_required_env()
     supabase = create_client(supabase_url, service_role_key)
 
-    attendees = load_attendees(supabase, company=args.company, test=args.test)
+    attendees = load_attendees(
+        supabase,
+        event_slug=args.event_slug,
+        company=args.company,
+        test=args.test,
+    )
     print("=" * 60)
     print("Fetch Attendee LinkedIn (Apollo → Tavily)")
-    print(f"Event:   {EVENT_SLUG}")
+    print(f"Event:   {args.event_slug}")
     print(f"Filter:  enrichment_tier=priority, linkedin_url IS NULL")
     if args.company:
         print(f"Company: {args.company}")

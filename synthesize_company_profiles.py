@@ -29,10 +29,38 @@ from pipeline.db import (
 from pipeline.synthesize import synthesise_profile
 
 
+def parse_event_config_context(supabase, event_slug: str) -> tuple[dict, list[dict]]:
+    result = (
+        supabase.table("events")
+        .select("event_config")
+        .eq("slug", event_slug)
+        .maybe_single()
+        .execute()
+    )
+    config = (result.data or {}).get("event_config") or {}
+    if not isinstance(config, dict):
+        return {}, []
+
+    user_context = config.get("user_context")
+    raw_icps = config.get("icp_definitions") or config.get("icps") or []
+    if isinstance(raw_icps, dict):
+        icps = [
+            {"id": icp_id, **(value if isinstance(value, dict) else {})}
+            for icp_id, value in raw_icps.items()
+        ]
+    elif isinstance(raw_icps, list):
+        icps = [item for item in raw_icps if isinstance(item, dict)]
+    else:
+        icps = []
+
+    return (user_context if isinstance(user_context, dict) else {}), icps
+
+
 def main():
     opts = parse_pipeline_args()
     event_slug = opts["event_slug"]
     supabase = get_supabase()
+    client_context, icp_definitions = parse_event_config_context(supabase, event_slug)
 
     print("=" * 60)
     print("Synthesize Company Profiles")
@@ -81,6 +109,8 @@ def main():
                 inputs["website_summary"],
                 inputs["news_summary"],
                 inputs["linkedin_summary"],
+                client_context=client_context,
+                icp_definitions=icp_definitions,
                 signals_only=inputs["signals_only"],
             )
             if not result:

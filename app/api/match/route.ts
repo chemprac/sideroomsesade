@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     {
       error: "precomputed_not_ready",
       message:
-        "Match lists have not been built for this event yet. Run “Precompute all 4 match lists” in admin.",
+        "Match lists have not been built for this event yet. Run “Precompute match lists” in admin.",
       matched: 0,
     },
     { status: 503 }

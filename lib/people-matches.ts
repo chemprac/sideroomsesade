@@ -4,6 +4,7 @@ import { companyIsCompetitor, type CompanyProfileRow } from "@/lib/company-match
 type SupabaseClient = ReturnType<typeof createServerClient>;
 
 export type ApproachIntel = {
+  relevance_to_client?: string;
   relevance_to_distinkt?: string;
   background?: string;
   decision_power?:

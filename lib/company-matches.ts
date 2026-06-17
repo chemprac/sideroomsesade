@@ -44,39 +44,15 @@ function icpScore(profile: CompanyProfileRow, icp: string): number {
 }
 
 const MIN_ICP_SCORE = 50;
-const STRONG_SECONDARY_MIN = 60;
-const STRONG_SECONDARY_GAP = 10;
 
 export function companyIsCompetitor(profile: CompanyProfileRow): boolean {
   if (profile.company_type === "competitor") return true;
   return profile.competitor_signal?.is_competitor === true;
 }
 
-/** True when a company is a genuine fit for the active ICP tab (not just sorted by score). */
+/** True when a company qualifies for the active ICP tab by that tab's score. */
 export function isMatchForIcp(profile: CompanyProfileRow, icp: string): boolean {
-  const scores = profile.icp_scores;
-  if (!scores || typeof scores !== "object") return false;
-
-  const score = icpScore(profile, icp);
-  if (score < MIN_ICP_SCORE) return false;
-
-  if (profile.company_type === icp) return true;
-
-  const numericScores = Object.entries(scores)
-    .map(([key, value]) => [key, typeof value === "number" ? value : Number(value) || 0] as const)
-    .filter(([, value]) => value > 0);
-
-  if (!numericScores.length) return false;
-
-  const maxScore = Math.max(...numericScores.map(([, value]) => value));
-  const topIcps = numericScores
-    .filter(([, value]) => value === maxScore)
-    .map(([key]) => key);
-
-  if (topIcps.includes(icp)) return true;
-
-  // Secondary fit: strong score within 10 points of the company's best ICP.
-  return score >= STRONG_SECONDARY_MIN && maxScore - score <= STRONG_SECONDARY_GAP;
+  return icpScore(profile, icp) >= MIN_ICP_SCORE;
 }
 
 export async function fetchCompanyMatches(

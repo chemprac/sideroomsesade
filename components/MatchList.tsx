@@ -3,32 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Topbar } from "./Topbar";
-import { MatchTable, getShortlist, matchesFilterChip } from "./MatchTable";
-import type { MatchFilterChip } from "./MatchTable";
+import { MatchTable, getShortlist } from "./MatchTable";
 import { PaywallModal } from "./PaywallModal";
 import { PaywallBanner } from "./PaywallBanner";
 import { FREE_PREVIEW_ROWS, isPaywallBypassed } from "@/lib/paywall";
 import type { MatchWithAttendee } from "@/lib/types";
 import type { ReactNode } from "react";
-
-type FilterChip = MatchFilterChip;
-
-const FILTER_CHIPS: { key: FilterChip; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "founders", label: "Founders" },
-  { key: "investors", label: "Investors" },
-  { key: "students", label: "Students" },
-  { key: "executives", label: "Executives" },
-  { key: "shortlisted", label: "Shortlisted" },
-];
-
-const FILTER_EMPTY_LABEL: Record<Exclude<FilterChip, "all">, string> = {
-  founders: "founders",
-  investors: "investors",
-  students: "students",
-  executives: "executives",
-  shortlisted: "shortlisted",
-};
 
 interface MatchListProps {
   eventSlug: string;
@@ -68,7 +48,6 @@ export function MatchList({
     paywallBypassProp ?? isPaywallBypassed(eventSlug);
   const [matches] = useState(initialMatches);
   const [paid, setPaid] = useState(initialPaid || bypass);
-  const [filterChip, setFilterChip] = useState<FilterChip>("all");
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [shortlistIds, setShortlistIds] = useState<string[]>([]);
   const [paywallOpen, setPaywallOpen] = useState(false);
@@ -118,16 +97,12 @@ export function MatchList({
   );
 
   const filterActive =
-    isUnlocked && (filterChip !== "all" || searchQuery.trim().length > 0);
+    isUnlocked && searchQuery.trim().length > 0;
 
   const filtered = useMemo(() => {
     if (!isUnlocked) return sorted;
-    return sorted.filter(
-      (m) =>
-        matchesSearch(m, searchQuery) &&
-        matchesFilterChip(m, filterChip, shortlistIds)
-    );
-  }, [sorted, isUnlocked, searchQuery, filterChip, shortlistIds]);
+    return sorted.filter((m) => matchesSearch(m, searchQuery));
+  }, [sorted, isUnlocked, searchQuery]);
 
   const unlockedFiltered = useMemo(() => {
     return filtered.filter(
@@ -168,14 +143,6 @@ export function MatchList({
     setPaywallOpen(true);
   };
 
-  const handleChipClick = (chip: FilterChip) => {
-    if (!isUnlocked && chip !== "all") {
-      handleShowSignup();
-      return;
-    }
-    setFilterChip(chip);
-  };
-
   const handleSearchInteraction = () => {
     if (!isUnlocked) {
       handleShowSignup();
@@ -183,12 +150,6 @@ export function MatchList({
   };
 
   const emptyFilterMessage = (() => {
-    if (filterChip === "shortlisted" && shortlistIds.length === 0) {
-      return "Nothing saved yet — bookmark attendees as you scroll to build your shortlist.";
-    }
-    if (filterChip !== "all") {
-      return `No ${FILTER_EMPTY_LABEL[filterChip]} in your top results — scroll down to see more.`;
-    }
     return "No matches in your top results — scroll down to see more.";
   })();
 
@@ -323,18 +284,6 @@ export function MatchList({
             onFocus={handleSearchInteraction}
             onClick={handleSearchInteraction}
           />
-          <div className="matches-filter-chips">
-            {FILTER_CHIPS.map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                className={`matches-filter-chip ${filterChip === key ? "active" : ""}`}
-                onClick={() => handleChipClick(key)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
         </div>
 
         {showEmptyFilterMessage ? (

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import os
 import time
 from pathlib import Path
@@ -40,11 +41,11 @@ def load_required_env() -> tuple[str, str, str]:
     return supabase_url, service_role_key, tavily_api_key
 
 
-def get_distinct_companies(supabase: Client) -> list[str]:
+def get_distinct_companies(supabase: Client, event_slug: str) -> list[str]:
     response = (
         supabase.table("attendees")
         .select("company")
-        .eq("event_slug", EVENT_SLUG)
+        .eq("event_slug", event_slug)
         .not_.is_("company", "null")
         .neq("company", "")
         .neq("company", "None")
@@ -108,14 +109,14 @@ def tavily_find_company_linkedin(company_name: str, tavily_api_key: str) -> str 
 
 
 def upsert_company_profile(
-    supabase: Client, company_name: str, linkedin_url: str
+    supabase: Client, event_slug: str, company_name: str, linkedin_url: str
 ) -> None:
     (
         supabase.table("company_profiles")
         .upsert(
             {
                 "company_name": company_name,
-                "event_slug": EVENT_SLUG,
+                "event_slug": event_slug,
                 "linkedin_url": linkedin_url,
             },
             on_conflict="company_name,event_slug",
@@ -134,11 +135,21 @@ def log_linkedin(url: str) -> str:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Fetch company LinkedIn URLs from Tavily"
+    )
+    parser.add_argument(
+        "--event-slug",
+        default=EVENT_SLUG,
+        help=f"Event slug to process (default: {EVENT_SLUG})",
+    )
+    args = parser.parse_args()
+
     supabase_url, service_role_key, tavily_api_key = load_required_env()
     supabase = create_client(supabase_url, service_role_key)
 
-    companies = get_distinct_companies(supabase)
-    print(f"Found {len(companies)} distinct companies for {EVENT_SLUG}")
+    companies = get_distinct_companies(supabase, args.event_slug)
+    print(f"Found {len(companies)} distinct companies for {args.event_slug}")
 
     found = 0
     not_found = 0
@@ -154,7 +165,7 @@ def main() -> None:
             continue
 
         if linkedin_url:
-            upsert_company_profile(supabase, company, linkedin_url)
+            upsert_company_profile(supabase, args.event_slug, company, linkedin_url)
             print(f"✓ {company} → {log_linkedin(linkedin_url)}")
             found += 1
         else:

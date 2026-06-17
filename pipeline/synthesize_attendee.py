@@ -11,14 +11,18 @@ def synthesize_approach_intel(
     title: str | None,
     company: str | None,
     company_context: dict | None,
+    client_context: dict | None,
     linkedin_profile_summary: str | None,
     linkedin_posts_summary: str | None,
     news_summary: str | None,
     speaker_info: dict | None,
 ) -> dict | None:
     cp = company_context or {}
-    icp_scores = cp.get("icp_scores") or {}
-    integration_score = icp_scores.get("integration_partner", 0)
+    client = client_context or {}
+    client_name = client.get("name") or "the client"
+    client_role = client.get("role") or "conference attendee"
+    client_background = client.get("background") or "Not available"
+    client_goal = client.get("looking_for") or "relevant conversations at this event"
 
     speaker_block = "Not a speaker"
     if speaker_info:
@@ -27,12 +31,13 @@ def synthesize_approach_intel(
             f"{speaker_info.get('session_title') or 'Session'}"
         )
 
-    prompt = f"""You are preparing personal approach intelligence for Distinkt's team at Identity Week 2026.
+    prompt = f"""You are preparing personal approach intelligence for {client_name} at this event.
 
-DISTINKT CONTEXT:
-Distinkt makes nano-engineered security pigments (Distinkt LUM) for physical product
-authentication. Clients: Philip Morris (IQOS), Sotheby's (provenance). Targeting security
-printers, ink manufacturers, pharma, luxury brands.
+CLIENT CONTEXT:
+Name: {client_name}
+Role: {client_role}
+Background: {client_background}
+Looking for: {client_goal}
 
 PERSON: {name}
 TITLE: {title or "Unknown"}
@@ -40,8 +45,7 @@ COMPANY: {company or "Unknown"}
 
 COMPANY CONTEXT:
 {cp.get("what_they_do") or "Not available"}
-Company type for Distinkt: {cp.get("company_type") or "unknown"}
-Integration partner score: {integration_score}
+Company type: {cp.get("company_type") or "unknown"}
 
 LINKEDIN PROFILE SUMMARY:
 {linkedin_profile_summary or "Not available"}
@@ -69,7 +73,8 @@ Return ONLY valid JSON — no markdown, no preamble:
     "specific talking point 2",
     "specific talking point 3"
   ],
-  "relevance_to_distinkt": "one sentence under 15 words — why is this person worth Distinkt's time",
+  "relevance_to_client": "one sentence under 15 words — why is this person worth {client_name}'s time",
+  "relevance_to_distinkt": "same value as relevance_to_client, kept for compatibility",
   "is_speaker": false,
   "session_info": null
 }}
@@ -81,7 +86,8 @@ RULES:
 4. seniority: executive = C-suite, MD, Director, VP. founder = self-employed/founder. senior = manager, head of, lead. mid = specialist, analyst, consultant. junior = coordinator, assistant, intern
 5. is_speaker = true only if SPEAKER INFO above is not "Not a speaker"
 6. session_info = null if not a speaker
-7. Escape backslashes and quotes properly in JSON strings."""
+7. Do not mention Distinkt, Identity Week, Sotheby's, Philip Morris, physical authentication, security pigments, pharma, or luxury unless they appear in the person's own profile/company context.
+8. Escape backslashes and quotes properly in JSON strings."""
 
     try:
         raw = call_gemini(prompt, max_tokens=2000)

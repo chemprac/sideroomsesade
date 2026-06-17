@@ -1,4 +1,4 @@
-export type IcpType = "investor" | "sales" | "partners" | "job";
+export type IcpType = string;
 
 export type EventStatus = "draft" | "live";
 

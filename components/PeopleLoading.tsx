@@ -67,7 +67,7 @@ export function PeopleLoading({
             </p>
             <p className="muted-text" style={{ marginTop: 8, marginBottom: 20 }}>
               {error === "not_ready"
-                ? "An admin needs to run “Precompute all 4 match lists” for this event, then try again."
+                ? "An admin needs to run “Precompute match lists” for this event, then try again."
                 : "Something went wrong. Try again."}
             </p>
             <button
