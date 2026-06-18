@@ -67,7 +67,7 @@ function DecisionPowerBadge({ level, detail }: { level: string; detail: string }
   );
 }
 
-function TierBadge({
+function MatchWhyBox({
   level,
   matchContext,
   matchReason,
@@ -78,13 +78,14 @@ function TierBadge({
 }) {
   const label = tierBadgeWithContext(level, matchContext, matchReason);
   const fullContext = (matchContext ?? matchReason ?? "").trim();
+  if (!label) return null;
   return (
-    <span
-      className={`person-match-badge person-match-badge--tier person-match-badge--tier-${level} person-match-badge--tier-context`}
+    <p
+      className={`person-match-why person-match-why--${level}`}
       title={fullContext || undefined}
     >
       {label}
-    </span>
+    </p>
   );
 }
 
@@ -228,13 +229,6 @@ export function PersonMatchCard({
               context={intel?.seniority_context}
             />
             <DecisionPowerBadge level={decision.level} detail={decision.detail} />
-            {badgeLevel ? (
-              <TierBadge
-                level={badgeLevel}
-                matchContext={intel?.match_context}
-                matchReason={person.match_reason}
-              />
-            ) : null}
             {person.is_speaker ? (
               <span className="person-match-badge person-match-badge--speaker">
                 Speaker
@@ -282,6 +276,14 @@ export function PersonMatchCard({
             ) : null}
           </p>
         )}
+
+        {badgeLevel ? (
+          <MatchWhyBox
+            level={badgeLevel}
+            matchContext={intel?.match_context}
+            matchReason={person.match_reason}
+          />
+        ) : null}
 
         {oneLiner ? (
           <p className="person-match-oneliner">{oneLiner}</p>

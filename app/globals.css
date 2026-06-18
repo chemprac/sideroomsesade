@@ -2184,8 +2184,40 @@ select {
   font-size: 14px;
   font-weight: 500;
   color: var(--ink);
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   line-height: 1.4;
+}
+
+.person-match-why {
+  font-family: var(--font-mono), "DM Mono", monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1.45;
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 2px;
+  border: 1px solid var(--border);
+  background: #ede5d0;
+  color: var(--ink);
+}
+
+.person-match-why--high {
+  background: #1c1208;
+  color: #f5f0e6;
+  border-color: #1c1208;
+}
+
+.person-match-why--strong {
+  background: #ede5d0;
+  color: var(--ink);
+  border-color: #c4842a;
+}
+
+.person-match-why--moderate {
+  background: transparent;
+  color: var(--muted);
+  border-color: var(--border);
 }
 
 .person-match-expertise {
