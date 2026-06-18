@@ -3,12 +3,27 @@ export type EventIcpDefinition = {
   id: string;
   label: string;
   emoji?: string;
+  description?: string;
+  signals?: string[];
+  negative_signals?: string[];
+};
+
+export type UserContext = {
+  name?: string;
+  role?: string;
+  background?: string;
+  looking_for?: string;
+  schools?: string[];
+  employers?: string[];
+  interests?: string[];
+  locations?: string[];
 };
 
 export type EventConfig = {
   icp_definitions?: EventIcpDefinition[];
   /** Legacy config key; use icp_definitions for new events. */
   icps?: EventIcpDefinition[];
+  user_context?: UserContext;
 };
 
 function parseIcpDefinitions(raw: unknown): EventIcpDefinition[] | undefined {
@@ -37,11 +52,32 @@ export function parseEventConfig(raw: unknown): EventConfig {
   const config = raw as EventConfig;
   const icpDefinitions = parseIcpDefinitions(config.icp_definitions);
   const legacyIcps = parseIcpDefinitions(config.icps);
+  const userContext = parseUserContext(config.user_context);
 
   return {
     ...(icpDefinitions ? { icp_definitions: icpDefinitions } : {}),
     ...(legacyIcps ? { icps: legacyIcps } : {}),
+    ...(userContext ? { user_context: userContext } : {}),
   };
+}
+
+export function parseUserContext(raw: unknown): UserContext | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const ctx = raw as UserContext;
+  if (!ctx.name && !ctx.role && !ctx.background && !ctx.looking_for) {
+    if (!ctx.schools?.length && !ctx.employers?.length && !ctx.interests?.length) {
+      return undefined;
+    }
+  }
+  return ctx;
+}
+
+export function getIcpDefinition(
+  eventConfig: EventConfig | null | undefined,
+  icpId: string
+): EventIcpDefinition | undefined {
+  const icps = getEventIcps(eventConfig ?? undefined);
+  return icps.find((icp) => icp.id === icpId);
 }
 
 /** ICPs from DB event_config; no hardcoded event fallbacks. */

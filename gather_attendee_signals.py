@@ -42,6 +42,7 @@ from pipeline.attendee_signals import (
     summarize_linkedin_profile,
     summarize_person_news,
 )
+from pipeline.attendee_url_overrides import get_attendee_linkedin_override
 from pipeline.config import APIFY_BATCH_SIZE, DELAY_BETWEEN, GEMINI_MODEL
 from pipeline.db import get_supabase, utc_now_iso
 
@@ -66,7 +67,17 @@ def gather_attendee(supabase, event_slug: str, attendee: dict, opts: dict) -> di
     name = attendee["name"]
     title = attendee.get("title")
     company = attendee.get("company") or ""
-    linkedin_url = (attendee.get("linkedin_url") or "").strip()
+
+    override_url = get_attendee_linkedin_override(event_slug, name)
+    if override_url:
+        linkedin_url = override_url.strip()
+        if (attendee.get("linkedin_url") or "").strip() != linkedin_url:
+            supabase.table("attendees").update({"linkedin_url": linkedin_url}).eq(
+                "id", attendee_id
+            ).execute()
+            print(f"  [url] override applied → {linkedin_url}")
+    else:
+        linkedin_url = (attendee.get("linkedin_url") or "").strip()
 
     force = opts["force"]
     force_profile = opts["force_profile"]

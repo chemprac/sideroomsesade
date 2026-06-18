@@ -1,5 +1,10 @@
 import { MATCH_ALGORITHM_VERSION, ICP_GOAL_LABELS } from "@/lib/match-algorithm";
 import {
+  getAttendeeEnrichment,
+  hasEsadeProfile,
+} from "@/lib/attendee-enrichment";
+import type { EventIcpDefinition, UserContext } from "@/lib/event-config";
+import {
   applyScoreCeiling,
   getProfileForIntent,
   getScoreCeiling,
@@ -10,6 +15,7 @@ import { chatJson, OpenRouterError, parseJson } from "@/lib/openrouter";
 import type { AttendeeWithProfile, IcpType } from "@/lib/types";
 
 const BATCH_SIZE = 50;
+const CONFIG_BATCH_SIZE = 25;
 const BATCH_CONCURRENCY = 4;
 const NARRATIVE_MAX_WORDS = 400;
 
@@ -38,6 +44,28 @@ export type ScoredMatchRow = {
   open_with: string | null;
   tags: string[];
 };
+
+export type EventScoringConfig = {
+  userContext?: UserContext | null;
+  icpDefinition?: EventIcpDefinition | null;
+};
+
+const CONFIG_DRIVEN_SYSTEM_PROMPT = `You are an expert conference networking strategist specialising in B2B fintech marketing and fractional leadership.
+
+Your job is to score conference attendees for how useful they would be for the client to meet at this event. Think about commercial intent — who can hire, partner with, or refer the client — not just job titles on a badge.
+
+Critical rules:
+- Prioritise **Background**, **Relevance**, and **Seniority** over stale LinkedIn fields
+- CMOs, VPs Marketing, and Heads of Brand at growth-stage fintechs are high-value for fractional CMO conversations
+- Pure vendors, agencies pitching services, or junior marketers are lower priority unless ICP signals say otherwise
+- Apply negative signals strictly — downrank attendees who match them
+- Be discriminating: most attendees should be medium or low
+
+Return one of four tier labels:
+- very_high: Direct fit — exactly who the client came for. Max 10% of attendees.
+- high: Strong fit — worth prioritising. Max 20% of attendees.
+- medium: Some relevance — worth meeting if time allows.
+- low: Weak or no fit — not worth prioritising.`;
 
 const MATCH_SCORING_SYSTEM_PROMPT = `You are an expert conference networking strategist with deep knowledge of startup ecosystems, venture capital, and professional networking.
 
@@ -96,10 +124,79 @@ export function scoreToTier(score: number): TierLabel {
   return "low";
 }
 
-function getProfileBlob(
-  attendee: AttendeeWithProfile
-): Record<string, unknown> | null {
-  return getProfileForIntent(attendee);
+function isLegacyIcp(icpType: IcpType): boolean {
+  return Object.prototype.hasOwnProperty.call(ICP_GOAL_LABELS, icpType);
+}
+
+function buildUserContextBlock(userContext: UserContext | null | undefined): string {
+  if (!userContext) return "none";
+  const parts = [
+    userContext.name ? `Name: ${userContext.name}` : null,
+    userContext.role ? `Role: ${userContext.role}` : null,
+    userContext.background ? `Background: ${userContext.background}` : null,
+    userContext.looking_for ? `Looking for: ${userContext.looking_for}` : null,
+  ].filter(Boolean);
+  return parts.length ? parts.join("\n") : "none";
+}
+
+function buildConfigGoalLabel(icpDefinition: EventIcpDefinition | null | undefined): string {
+  if (!icpDefinition) return "Configured ICP — score fit for the client's event goals";
+  const signals = icpDefinition.signals?.length
+    ? `Positive signals: ${icpDefinition.signals.join("; ")}`
+    : "";
+  const negatives = icpDefinition.negative_signals?.length
+    ? `Negative signals: ${icpDefinition.negative_signals.join("; ")}`
+    : "";
+  return [
+    icpDefinition.label.toUpperCase(),
+    icpDefinition.description ?? "",
+    signals,
+    negatives,
+  ]
+    .filter(Boolean)
+    .join(" — ");
+}
+
+function formatConfigAttendeeBlock(attendee: AttendeeWithProfile): string {
+  const enrichment = getAttendeeEnrichment(attendee);
+  const intel = enrichment.approach_intel;
+  const background =
+    intel?.background?.trim() ||
+    enrichment.linkedin_profile_summary?.trim() ||
+    "Not available";
+  const relevance = intel?.relevance_to_client?.trim() || "Not available";
+  const seniority =
+    enrichment.seniority ?? intel?.seniority ?? attendee.title ?? "Unknown";
+  const posts = enrichment.linkedin_posts_summary?.trim() || "Not available";
+  const bestApproach = intel?.best_approach?.trim() || "Not available";
+
+  return [
+    "---",
+    `ID: ${attendee.id}`,
+    `Name: ${attendee.name}`,
+    `Role: ${attendee.title ?? "Unknown"} | Company: ${attendee.company ?? "Unknown"}`,
+    `Seniority: ${seniority}`,
+    `Background: ${truncateWords(background, 200)}`,
+    `Relevance to client: ${truncateWords(relevance, 150)}`,
+    `LinkedIn posts summary: ${truncateWords(posts, 150)}`,
+    `Best approach hint: ${truncateWords(bestApproach, 100)}`,
+    "---",
+  ].join("\n");
+}
+
+function formatAttendeeBlockForScoring(
+  attendee: AttendeeWithProfile,
+  icpType: IcpType,
+  config?: EventScoringConfig | null
+): string {
+  const enrichment = getAttendeeEnrichment(attendee);
+  if (hasEsadeProfile(enrichment)) {
+    return formatAttendeeBlock(attendee, icpType);
+  }
+  if (config?.icpDefinition || !isLegacyIcp(icpType)) {
+    return formatConfigAttendeeBlock(attendee);
+  }
+  return formatAttendeeBlock(attendee, icpType);
 }
 
 function formatSignalList(value: unknown): string {
@@ -123,6 +220,12 @@ function formatEducationSnippet(profile: Record<string, unknown>): string {
     })
     .filter(Boolean)
     .join("; ");
+}
+
+function getProfileBlob(
+  attendee: AttendeeWithProfile
+): Record<string, unknown> | null {
+  return getProfileForIntent(attendee);
 }
 
 function formatAttendeeBlock(
@@ -205,29 +308,49 @@ async function scoreBatch(
   batch: AttendeeWithProfile[],
   icpType: IcpType,
   icpContext: string | null,
-  goalLabel: string
+  goalLabel: string,
+  config?: EventScoringConfig | null
 ): Promise<AiTieredResult[]> {
+  const useConfig = Boolean(config?.icpDefinition) || !isLegacyIcp(icpType);
+  const maxTokens = useConfig ? 8000 : 4096;
+  const systemPrompt = useConfig
+    ? CONFIG_DRIVEN_SYSTEM_PROMPT
+    : MATCH_SCORING_SYSTEM_PROMPT;
+
   const attendeeBlocks = batch
-    .map((a) => formatAttendeeBlock(a, icpType))
+    .map((a) => formatAttendeeBlockForScoring(a, icpType, config))
     .join("\n");
 
-  const prompt = `User goal: ${goalLabel}
-User's additional context: ${icpContext ?? "none"}
+  const clientBlock = useConfig
+    ? `\nClient profile:\n${buildUserContextBlock(config?.userContext)}\n`
+    : "";
 
-Score the following attendees. For each one:
-1. Read the **Narrative** first — it describes what they are actually doing now.
+  const scoringSteps = useConfig
+    ? `1. Read **Background** and **Relevance to client** first.
+2. Check seniority and company stage against the ICP signals.
+3. Apply negative signals — downrank vendors or poor fits.
+4. Choose a tier label: very_high | high | medium | low.
+5. Write match_reason explaining why they are or are not a strong match for this client and ICP.
+6. Write open_with: one ready-to-say conversation opener, first person, specific to this person (1-2 sentences max).`
+    : `1. Read the **Narrative** first — it describes what they are actually doing now.
 2. Read the **ICP Assessment** — pre-written fit for this goal.
 3. Apply critical judgement using the intent rules above. Do NOT score highly based on a former employer in LinkedIn fields if the narrative says they are a student or job seeker.
 4. Choose a tier label: very_high | high | medium | low.
 5. Write a match_reason that explains WHY they are or are not a strong match — reference what the narrative says about their current situation, not just a past company name.
-6. Write an open_with line: one ready-to-say conversation opener, first person, specific to this person (1-2 sentences max).
+6. Write an open_with line: one ready-to-say conversation opener, first person, specific to this person (1-2 sentences max).`;
+
+  const prompt = `User goal: ${goalLabel}
+User's additional context: ${icpContext ?? "none"}${clientBlock}
+
+Score the following attendees. For each one:
+${scoringSteps}
 
 Return ONLY a valid JSON array, no preamble:
 [
   {
     "attendee_id": "uuid",
     "tier": "very_high" | "high" | "medium" | "low",
-    "match_reason": "2-3 sentences. Why they are or are not a strong match. Reference their actual current situation.",
+    "match_reason": "2-3 sentences. Why they are or are not a strong match.",
     "open_with": "One ready-to-say conversation opener. First person. Specific to this person. 1-2 sentences max."
   }
 ]
@@ -235,12 +358,7 @@ Return ONLY a valid JSON array, no preamble:
 Attendees:
 ${attendeeBlocks}`;
 
-  const raw = await chatJson(
-    MATCH_SCORING_SYSTEM_PROMPT,
-    prompt,
-    4096,
-    0.2
-  );
+  const raw = await chatJson(systemPrompt, prompt, maxTokens, 0.2);
 
   const batchScores = parseJson<AiTieredResult[]>(raw);
   if (!batchScores?.length) {
@@ -255,19 +373,31 @@ ${attendeeBlocks}`;
 async function scoreWithAi(
   attendees: AttendeeWithProfile[],
   icpType: IcpType,
-  icpContext: string | null
+  icpContext: string | null,
+  config?: EventScoringConfig | null
 ): Promise<AiTieredResult[]> {
-  const goalLabel = ICP_GOAL_LABELS[icpType];
+  const goalLabel =
+    config?.icpDefinition || !isLegacyIcp(icpType)
+      ? buildConfigGoalLabel(config?.icpDefinition)
+      : ICP_GOAL_LABELS[icpType];
+
+  const batchSize =
+    config?.icpDefinition || !isLegacyIcp(icpType)
+      ? CONFIG_BATCH_SIZE
+      : BATCH_SIZE;
+
   const batches: AttendeeWithProfile[][] = [];
-  for (let i = 0; i < attendees.length; i += BATCH_SIZE) {
-    batches.push(attendees.slice(i, i + BATCH_SIZE));
+  for (let i = 0; i < attendees.length; i += batchSize) {
+    batches.push(attendees.slice(i, i + batchSize));
   }
 
   const allScores: AiTieredResult[] = [];
   for (let i = 0; i < batches.length; i += BATCH_CONCURRENCY) {
     const chunk = batches.slice(i, i + BATCH_CONCURRENCY);
     const chunkResults = await Promise.all(
-      chunk.map((batch) => scoreBatch(batch, icpType, icpContext, goalLabel))
+      chunk.map((batch) =>
+        scoreBatch(batch, icpType, icpContext, goalLabel, config)
+      )
     );
     for (const batchScores of chunkResults) {
       allScores.push(...batchScores);
@@ -277,17 +407,19 @@ async function scoreWithAi(
   return allScores;
 }
 
-/** Score all attendees for one ICP; applies intent ceilings. */
+/** Score all attendees for one ICP; applies intent ceilings for legacy ICPs only. */
 export async function scoreAttendeesForIcp(
   attendeeList: AttendeeWithProfile[],
   icpType: IcpType,
-  icpContext: string | null
+  icpContext: string | null,
+  config?: EventScoringConfig | null
 ): Promise<{ rows: ScoredMatchRow[]; source: "ai" | "fallback" }> {
+  const useLegacyCeiling = isLegacyIcp(icpType) && !config?.icpDefinition;
   let scores: AiTieredResult[] | null = null;
   let usedFallback = false;
 
   try {
-    scores = await scoreWithAi(attendeeList, icpType, icpContext);
+    scores = await scoreWithAi(attendeeList, icpType, icpContext, config);
   } catch (err) {
     console.warn(
       "Match AI failed, using fallback:",
@@ -309,9 +441,10 @@ export async function scoreAttendeesForIcp(
     if (!validIds.has(s.attendee_id)) continue;
     const attendee = attendeeById.get(s.attendee_id);
     const profile = attendee ? getProfileForIntent(attendee) : null;
-    const ceiling = attendee
-      ? getScoreCeiling(icpType, profile, attendee)
-      : null;
+    const ceiling =
+      useLegacyCeiling && attendee
+        ? getScoreCeiling(icpType, profile, attendee)
+        : null;
 
     const baseScore = tierToScore(s.tier);
     const adjustedScore = applyScoreCeiling(baseScore, ceiling);
@@ -333,9 +466,10 @@ export async function scoreAttendeesForIcp(
       if (dedupedScores.has(s.attendee_id)) continue;
       const attendee = attendeeById.get(s.attendee_id);
       const profile = attendee ? getProfileForIntent(attendee) : null;
-      const ceiling = attendee
-        ? getScoreCeiling(icpType, profile, attendee)
-        : null;
+      const ceiling =
+        useLegacyCeiling && attendee
+          ? getScoreCeiling(icpType, profile, attendee)
+          : null;
 
       const baseScore = tierToScore(s.tier);
       const adjustedScore = applyScoreCeiling(baseScore, ceiling);

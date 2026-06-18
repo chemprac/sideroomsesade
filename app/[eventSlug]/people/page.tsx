@@ -55,6 +55,7 @@ export default async function PeoplePage({
         icps={icps}
         activeIcp={activeIcp}
         initialCompanyFilter={companyFilter ?? ""}
+        showNav
       />
     </Suspense>
   );

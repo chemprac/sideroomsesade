@@ -19,13 +19,13 @@ export async function GET(request: NextRequest) {
   const supabase = createServerClient();
 
   try {
-    const { people, totalEligible } = await fetchPeopleMatches(
+    const { people, totalEligible, clientName } = await fetchPeopleMatches(
       supabase,
       dbSlug,
       icp,
       company
     );
-    return NextResponse.json({ people, count: people.length, totalEligible });
+    return NextResponse.json({ people, count: people.length, totalEligible, clientName });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to load matches";
     return NextResponse.json({ error: message }, { status: 500 });

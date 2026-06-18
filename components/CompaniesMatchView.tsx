@@ -57,7 +57,7 @@ export function CompaniesMatchView({
 
   return (
     <>
-      <Topbar eventSlug={eventSlug} />
+      <Topbar eventSlug={eventSlug} showNav activeView="companies" />
       <div className="match-page">
         <div className="match-page-stamp">{eventName}</div>
         <h1 className="match-page-title">Your matched companies</h1>
@@ -86,9 +86,8 @@ export function CompaniesMatchView({
           <p className="match-page-loading">Fetching company matches…</p>
         ) : companies.length === 0 ? (
           <p className="match-page-empty">
-            No companies at this conference match this ICP yet. Most attendees are
-            security printers and document manufacturers — try Integration Partners
-            or Pilot Customers.
+            No companies match this ICP yet. Try the other tab — brand-side
+            fintechs and marketing partners are scored separately.
           </p>
         ) : (
           <div className="company-match-list">

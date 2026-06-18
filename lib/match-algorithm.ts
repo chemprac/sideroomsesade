@@ -1,5 +1,5 @@
 /** Bump when scoring inputs or post-processing change — invalidates cached matches. */
-export const MATCH_ALGORITHM_VERSION = 4;
+export const MATCH_ALGORITHM_VERSION = 5;
 
 export const MATCH_ALGORITHM_COOKIE = "sideroom_match_algo_v";
 

@@ -132,6 +132,37 @@ select {
   color: var(--muted);
 }
 
+.topbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  margin-right: 12px;
+}
+
+.topbar-nav-link {
+  font-family: var(--font-mono), "DM Mono", monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+}
+
+.topbar-nav-link:hover {
+  color: var(--ink);
+  border-color: var(--border);
+}
+
+.topbar-nav-link.is-active {
+  color: var(--ink);
+  border-color: var(--border);
+  background: var(--aged);
+}
+
 /* Nav strip */
 .nav-strip {
   background: var(--aged);
@@ -1937,11 +1968,11 @@ select {
 
 .person-match-relevance {
   font-family: var(--font-body), "DM Sans", system-ui, sans-serif;
-  font-size: 13px;
-  font-style: italic;
-  color: var(--ink);
-  margin: 10px 0 0;
-  line-height: 1.5;
+  font-size: 12px;
+  font-style: normal;
+  color: var(--muted);
+  margin: 8px 0 0;
+  line-height: 1.45;
 }
 
 .person-match-card-aside {
@@ -1986,6 +2017,46 @@ select {
   background: #C4842A;
   color: #FAEEDA;
   border: 1px solid #C4842A;
+}
+
+.person-match-badge--decision-high {
+  background: #2a5a1a;
+  color: #f5f0e6;
+  border: 1px solid #2a5a1a;
+}
+
+.person-match-badge--decision-medium {
+  background: transparent;
+  color: #1c1208;
+  border: 1px solid #c4842a;
+}
+
+.person-match-badge--decision-low {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.person-match-opener-block {
+  margin-bottom: 0;
+}
+
+.person-match-opener-block + .person-match-talking {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.person-match-expanded .person-match-talking {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.person-match-expanded .person-match-opener-block + .person-match-talking {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
 }
 
 .person-match-expanded {
@@ -2083,7 +2154,310 @@ select {
   color: var(--muted);
 }
 
+.person-match-badge--tier {
+  background: #1C1208;
+  color: #F5F0E6;
+  border: 1px solid #1C1208;
+}
+
+.person-match-badge--tier-strong {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--ink);
+}
+
+.person-match-badge--tier-moderate {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.person-match-badge--tier-context {
+  max-width: 100%;
+  white-space: normal;
+  text-align: right;
+  line-height: 1.35;
+}
+
+.person-match-oneliner {
+  font-family: var(--font-body), "DM Sans", system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  margin: 8px 0 0;
+  line-height: 1.4;
+}
+
+.person-match-expertise {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.person-match-expertise-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 8px;
+}
+
+.person-match-expertise-label {
+  font-family: var(--font-mono), "DM Mono", monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #c4842a;
+  flex-shrink: 0;
+}
+
+.person-match-expertise .person-match-tags {
+  margin-top: 0;
+  flex: 1;
+}
+
+.person-match-tag--domain {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+.person-match-tag--function {
+  color: var(--muted);
+  border-color: var(--border);
+}
+
+.person-match-company-link {
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.person-match-company-link:hover {
+  color: #C4842A;
+}
+
+.person-match-session {
+  color: #C4842A;
+  font-family: var(--font-mono), "DM Mono", monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.person-match-connections {
+  margin-top: 8px;
+}
+
+.person-match-connections-label {
+  font-family: var(--font-mono), "DM Mono", monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #C4842A;
+  margin-bottom: 4px;
+}
+
+.person-match-connection-item {
+  font-family: var(--font-body), "DM Sans", system-ui, sans-serif;
+  font-size: 12px;
+  color: var(--ink);
+  margin: 0;
+  line-height: 1.45;
+}
+
+.person-match-signal {
+  font-family: var(--font-body), "DM Sans", system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--ink);
+  margin: 10px 0 0;
+  padding-left: 10px;
+  border-left: 2px solid #C4842A;
+  line-height: 1.45;
+}
+
+.person-match-enriching {
+  font-family: var(--font-mono), "DM Mono", monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 10px 0 0;
+}
+
+.person-match-opener-row {
+  margin-top: 10px;
+}
+
+.person-match-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono), "DM Mono", monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.person-match-copy-btn:hover {
+  border-color: #C4842A;
+  color: #C4842A;
+}
+
+.person-match-shortlist-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--paper);
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+}
+
+.person-match-shortlist-btn.is-active {
+  color: #C4842A;
+  border-color: #C4842A;
+  background: rgba(196, 132, 42, 0.08);
+}
+
+.person-match-card.is-shortlisted {
+  border-color: #C4842A;
+}
+
+.person-match-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.person-match-tag {
+  font-family: var(--font-mono), "DM Mono", monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--muted);
+}
+
+.person-match-skeleton {
+  pointer-events: none;
+}
+
+.person-match-skeleton-line {
+  height: 10px;
+  background: linear-gradient(
+    90deg,
+    rgba(196, 184, 154, 0.25) 0%,
+    rgba(196, 184, 154, 0.45) 50%,
+    rgba(196, 184, 154, 0.25) 100%
+  );
+  background-size: 200% 100%;
+  animation: person-match-shimmer 1.2s ease-in-out infinite;
+  border-radius: 2px;
+  margin-bottom: 8px;
+}
+
+.person-match-skeleton-line--short {
+  width: 28px;
+}
+
+.person-match-skeleton-line--title {
+  width: 55%;
+  height: 18px;
+}
+
+.person-match-skeleton-line--meta {
+  width: 40%;
+}
+
+.person-match-skeleton-line--body {
+  width: 85%;
+  margin-top: 4px;
+}
+
+@keyframes person-match-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.people-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.people-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.people-filter-chip {
+  font-family: var(--font-mono), "DM Mono", monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--paper);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.people-filter-chip.is-active {
+  color: var(--ink);
+  border-color: #C4842A;
+  background: rgba(196, 132, 42, 0.08);
+}
+
+.people-shortlist-bar {
+  font-family: var(--font-mono), "DM Mono", monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+
+.people-shortlist-link {
+  font: inherit;
+  color: #C4842A;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 @media (max-width: 768px) {
+  .people-filter-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .people-company-filter-input {
+    width: 100%;
+  }
+
+  .topbar-nav {
+    display: none;
+  }
+
   .person-match-columns {
     grid-template-columns: 1fr;
   }

@@ -56,11 +56,18 @@ const signals = [
   "Breakfast + lunch included",
 ];
 
+const EVENT_SLUG = "fintech-marketing-hub-london-2026";
+
+function personSearchHref(name: string): string {
+  return `/${EVENT_SLUG}/people?search=${encodeURIComponent(name)}`;
+}
+
 const agenda = [
   {
     color: COLORS.amber,
     title: "Opening keynote: The CMO under pressure",
     meta: "Mathieu Limousi · CMO, Thunes",
+    speakerSearch: "Mathieu Limousi",
   },
   {
     color: COLORS.blue,
@@ -76,6 +83,7 @@ const agenda = [
     color: COLORS.teal,
     title: "Masterclass: No PMM, no problem — AI fills the gap",
     meta: "Hector GHF · Product Marketing Lead, ClearBank",
+    speakerSearch: "Hector",
   },
   {
     color: COLORS.blue,
@@ -91,6 +99,7 @@ const agenda = [
     color: COLORS.coral,
     title: "Closing fireside: The CMO unplugged",
     meta: "Lauren Berkemeyer · CMO, YuLife",
+    speakerSearch: "Lauren Berkemeyer",
   },
 ];
 
@@ -452,7 +461,16 @@ export default function FintechMarketingSummerConBriefing() {
                         margin: 0,
                       }}
                     >
-                      {item.meta}
+                      {"speakerSearch" in item && item.speakerSearch ? (
+                        <Link
+                          href={personSearchHref(item.speakerSearch)}
+                          style={{ color: COLORS.ink, textDecoration: "none", borderBottom: `1px solid ${COLORS.amber}` }}
+                        >
+                          {item.meta}
+                        </Link>
+                      ) : (
+                        item.meta
+                      )}
                     </p>
                   </div>
                 </article>
@@ -545,8 +563,12 @@ export default function FintechMarketingSummerConBriefing() {
             }}
           >
             {speakers.map((speaker) => (
-              <article
+              <Link
                 key={speaker.name}
+                href={personSearchHref(speaker.name)}
+                style={{ textDecoration: "none", color: "inherit" }}
+              >
+              <article
                 style={{
                   border: `1px solid ${COLORS.border}`,
                   background: COLORS.parchment,
@@ -593,6 +615,7 @@ export default function FintechMarketingSummerConBriefing() {
                   </div>
                 </div>
               </article>
+              </Link>
             ))}
           </div>
         </section>
@@ -668,24 +691,62 @@ export default function FintechMarketingSummerConBriefing() {
           >
             Matched and ranked for Kathrin&apos;s goals
           </span>
-          <Link
-            href="/fintech-marketing-hub-london-2026/people"
-            style={{
-              background: COLORS.amber,
-              color: COLORS.ink,
-              border: `1px solid ${COLORS.amber}`,
-              borderRadius: 2,
-              padding: "12px 24px",
-              textDecoration: "none",
-              display: "inline-block",
-              fontFamily: "'DM Mono', monospace",
-              fontSize: 11,
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-            }}
-          >
-            View your match list
-          </Link>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <Link
+              href={`/${EVENT_SLUG}/people?icp=potential_client`}
+              style={{
+                background: COLORS.amber,
+                color: COLORS.ink,
+                border: `1px solid ${COLORS.amber}`,
+                borderRadius: 2,
+                padding: "12px 24px",
+                textDecoration: "none",
+                display: "inline-block",
+                fontFamily: "'DM Mono', monospace",
+                fontSize: 11,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+              }}
+            >
+              Potential clients
+            </Link>
+            <Link
+              href={`/${EVENT_SLUG}/people?icp=potential_partner`}
+              style={{
+                background: "transparent",
+                color: COLORS.ink,
+                border: `1px solid ${COLORS.border}`,
+                borderRadius: 2,
+                padding: "12px 24px",
+                textDecoration: "none",
+                display: "inline-block",
+                fontFamily: "'DM Mono', monospace",
+                fontSize: 11,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+              }}
+            >
+              Potential partners
+            </Link>
+            <Link
+              href={`/${EVENT_SLUG}/companies`}
+              style={{
+                background: "transparent",
+                color: COLORS.ink,
+                border: `1px solid ${COLORS.border}`,
+                borderRadius: 2,
+                padding: "12px 24px",
+                textDecoration: "none",
+                display: "inline-block",
+                fontFamily: "'DM Mono', monospace",
+                fontSize: 11,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+              }}
+            >
+              Matched companies
+            </Link>
+          </div>
         </footer>
       </div>
     </main>

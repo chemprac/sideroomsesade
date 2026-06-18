@@ -50,7 +50,7 @@ def fetch_company_context(supabase, event_slug: str, company: str | None) -> dic
         .maybe_single()
         .execute()
     )
-    return result.data
+    return result.data if result else None
 
 
 def fetch_speaker_info(supabase, event_slug: str, name: str) -> dict | None:
@@ -74,7 +74,7 @@ def fetch_client_context(supabase, event_slug: str) -> dict:
         .maybe_single()
         .execute()
     )
-    config = (result.data or {}).get("event_config") or {}
+    config = ((result.data if result else None) or {}).get("event_config") or {}
     if not isinstance(config, dict):
         return {}
     user_context = config.get("user_context")

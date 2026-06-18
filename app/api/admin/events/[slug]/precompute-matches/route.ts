@@ -4,7 +4,11 @@ import {
   countEventIcpMatches,
   upsertEventIcpMatches,
 } from "@/lib/event-icp-matches";
-import { getEventIcps, parseEventConfig } from "@/lib/event-config";
+import {
+  getEventIcps,
+  getIcpDefinition,
+  parseEventConfig,
+} from "@/lib/event-config";
 import { scoreAttendeesForIcp } from "@/lib/match-engine";
 import { createServerClient } from "@/lib/supabase";
 import type { AttendeeWithProfile, IcpType } from "@/lib/types";
@@ -36,10 +40,10 @@ export async function POST(
     return NextResponse.json({ error: "Event not found" }, { status: 404 });
   }
 
-  const icpTypes = getEventIcps(
-    parseEventConfig(eventRow.event_config),
-    slug
-  ).map((icp) => icp.id as IcpType);
+  const eventConfig = parseEventConfig(eventRow.event_config);
+  const icpTypes = getEventIcps(eventConfig, slug).map(
+    (icp) => icp.id as IcpType
+  );
 
   if (!icpTypes.length) {
     return NextResponse.json(
@@ -55,7 +59,7 @@ export async function POST(
   const { data: attendees } = await supabase
     .from("attendees")
     .select(
-      "id, event_slug, name, title, company, industry, funding_stage, company_size, bio_summary, attendee_profiles(profile)"
+      "id, event_slug, name, title, company, industry, funding_stage, company_size, bio_summary, attendee_profiles(approach_intel, seniority, linkedin_profile_summary, linkedin_posts_summary, profile)"
     )
     .eq("event_slug", slug);
 
@@ -63,8 +67,17 @@ export async function POST(
     return NextResponse.json({ error: "No attendees for event" }, { status: 400 });
   }
 
-  const attendeeList = attendees as AttendeeWithProfile[];
+  const attendeeList = attendees as unknown as AttendeeWithProfile[];
   const selectedIcpTypes = icpFilter ? [icpFilter] : icpTypes;
+  const userContext = eventConfig.user_context ?? null;
+  const icpContextParts = [
+    userContext?.background,
+    userContext?.looking_for,
+  ].filter(Boolean);
+  const icpContext = icpContextParts.length
+    ? icpContextParts.join(" · ")
+    : null;
+
   const results: Array<{
     icpType: IcpType;
     matched: number;
@@ -86,10 +99,12 @@ export async function POST(
       }
     }
 
+    const icpDefinition = getIcpDefinition(eventConfig, icpType) ?? null;
     const { rows, source } = await scoreAttendeesForIcp(
       attendeeList,
       icpType,
-      null
+      icpContext,
+      { userContext, icpDefinition }
     );
     await upsertEventIcpMatches(supabase, slug, icpType, rows);
     results.push({ icpType, matched: rows.length, source });

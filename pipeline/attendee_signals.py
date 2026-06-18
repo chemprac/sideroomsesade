@@ -267,30 +267,42 @@ def fetch_linkedin_posts_raw(linkedin_url: str, max_posts: int = 10) -> list:
 
 def fetch_person_news(name: str, company: str) -> list:
     try:
-        query = f'"{name}" "{company}" 2025 2026'
-        print(f"    [news] Searching {query[:80]}...")
-        r = requests.post(
-            "https://api.tavily.com/search",
-            json={
-                "api_key": TAVILY_API_KEY,
-                "query": query,
-                "search_depth": "basic",
-                "max_results": 5,
-                "include_raw_content": False,
-            },
-            timeout=15,
-        )
-        results = r.json().get("results", [])
-        articles = [
-            {
-                "title": x.get("title"),
-                "url": x.get("url"),
-                "content": (x.get("content") or "")[:500],
-            }
-            for x in results
+        queries = [
+            f'"{name}" "{company}" funding OR raised OR series 2025 2026',
+            f'"{name}" "{company}" marketing OR CMO OR appointed 2025 2026',
+            f'"{company}" acquired OR acquisition OR partnership fintech 2025 2026',
         ]
+        articles: list = []
+        seen_urls: set[str] = set()
+        for query in queries:
+            print(f"    [news] Searching {query[:80]}...")
+            r = requests.post(
+                "https://api.tavily.com/search",
+                json={
+                    "api_key": TAVILY_API_KEY,
+                    "query": query,
+                    "search_depth": "basic",
+                    "max_results": 3,
+                    "include_raw_content": False,
+                },
+                timeout=15,
+            )
+            for x in r.json().get("results", []):
+                url = x.get("url") or ""
+                if url in seen_urls:
+                    continue
+                seen_urls.add(url)
+                articles.append(
+                    {
+                        "title": x.get("title"),
+                        "url": url,
+                        "content": (x.get("content") or "")[:500],
+                    }
+                )
+            if len(articles) >= 5:
+                break
         print(f"    [news] {len(articles)} articles found")
-        return articles
+        return articles[:5]
     except Exception as e:
         print(f"    [news] ERROR: {e}")
         return []
@@ -334,9 +346,15 @@ POSTS:
 
 def summarize_person_news(name: str, company: str, articles: list) -> str:
     print("    [gemini] Summarizing news...")
-    prompt = f"""From these search results about {name} from {company}, extract any mentions of talks, publications, awards, or notable projects.
+    prompt = f"""From these search results about {name} at {company}, extract concrete marketing-relevant signals for a fintech conference.
 
-Return 2 bullet points or 'No notable mentions found.' Return plain text only.
+Return 2-3 short bullet points covering ONLY facts from the articles:
+- Funding rounds, acquisitions, partnerships
+- Marketing/CMO appointments, rebrands, campaigns
+- Product launches, DACH/Europe expansion
+- Quotes or topics {name} is associated with
+
+If nothing specific, return 'No notable mentions found.' Plain text bullets only.
 
 ARTICLES:
 {json.dumps(articles, indent=2)}"""
