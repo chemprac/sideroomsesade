@@ -331,7 +331,6 @@ export default function HomePage() {
                 style={s({ width: '100%', marginTop: 10, fontFamily: 'DM Sans, sans-serif', fontSize: 13, fontWeight: 500, letterSpacing: '0.04em', background: loading ? C.muted : C.ink, color: C.parchment, border: 'none', borderRadius: 3, padding: 12, cursor: loading ? 'default' : 'pointer' })}>
                 {loading ? 'Joining...' : 'Join the waitlist'}
               </button>
-              <p style={s({ fontSize: 11, color: C.muted, textAlign: 'center', marginTop: 10 })}>No spam. No password. Just a heads-up when your event goes live.</p>
             </>
           )}
         </div>
