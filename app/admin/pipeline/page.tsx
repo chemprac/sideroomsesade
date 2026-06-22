@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PipelineBoard } from "@/components/pipeline/PipelineBoard";
 import { ADMIN_AUTH_KEY, adminFetch } from "@/lib/admin-client";
-import type { OutreachLead } from "@/lib/outreach-pipeline";
+import type { OutreachLead, SourcingInitiative } from "@/lib/outreach-pipeline";
 
 export default function PipelinePage() {
   const [authenticated, setAuthenticated] = useState(false);
@@ -12,6 +12,7 @@ export default function PipelinePage() {
   const [secret, setSecret] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
   const [leads, setLeads] = useState<OutreachLead[] | null>(null);
+  const [initiatives, setInitiatives] = useState<SourcingInitiative[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -33,7 +34,10 @@ export default function PipelinePage() {
         const res = await adminFetch(secret, "/api/admin/outreach-leads");
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "Failed to load leads");
-        if (!cancelled) setLeads(data.leads ?? []);
+        if (!cancelled) {
+          setLeads(data.leads ?? []);
+          setInitiatives(data.initiatives ?? []);
+        }
       } catch (e) {
         if (!cancelled) {
           setLoadError(e instanceof Error ? e.message : "Failed to load");
@@ -70,6 +74,7 @@ export default function PipelinePage() {
     setSecret("");
     setAuthenticated(false);
     setLeads(null);
+    setInitiatives([]);
   };
 
   if (!authenticated) {
@@ -124,7 +129,13 @@ export default function PipelinePage() {
 
       {loading ? <p className="pipeline-loading">Loading leads…</p> : null}
       {loadError ? <p className="pipeline-error">{loadError}</p> : null}
-      {leads ? <PipelineBoard secret={secret} initialLeads={leads} /> : null}
+      {leads ? (
+        <PipelineBoard
+          secret={secret}
+          initialLeads={leads}
+          initialInitiatives={initiatives}
+        />
+      ) : null}
     </div>
   );
 }

@@ -3158,6 +3158,57 @@ select {
   margin-top: 10px;
 }
 
+.pipeline-card-initiative {
+  display: inline-block;
+  margin-top: 8px;
+  max-width: 100%;
+  font-family: var(--font-body), "DM Sans", sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.35;
+  padding: 4px 8px;
+  border-radius: 2px;
+  border: 1px solid #c4842a;
+  background: #fdf8f0;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pipeline-card-initiative--unset {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--ghost);
+  font-weight: 400;
+}
+
+.pipeline-stats-initiative {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-right: 16px;
+  margin-right: 8px;
+  border-right: 1px solid var(--border);
+  min-width: 140px;
+  max-width: 220px;
+}
+
+.pipeline-stats-initiative-label {
+  font-family: var(--font-mono), "DM Mono", monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.pipeline-stats-initiative-name {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  margin-top: 4px;
+}
+
 .pipeline-card-channel {
   display: inline-flex;
   align-items: center;
@@ -3261,6 +3312,12 @@ select {
 .pipeline-archived-meta {
   font-size: 11px;
   color: var(--muted);
+}
+
+.pipeline-archived-reason {
+  font-size: 11px;
+  color: var(--ink);
+  line-height: 1.4;
 }
 
 .pipeline-panel-backdrop {
@@ -3370,6 +3427,38 @@ select {
 .pipeline-panel-error {
   color: #8b1a1a;
   font-size: 13px;
+}
+
+.pipeline-panel-archive {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.pipeline-panel-archive-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 10px;
+  line-height: 1.45;
+}
+
+.pipeline-panel-archive-btn {
+  margin-top: 10px;
+  font-family: var(--font-mono), "DM Mono", monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: transparent;
+  color: #8b1a1a;
+  border: 1px solid #8b1a1a;
+  padding: 10px 16px;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.pipeline-panel-archive-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .pipeline-panel-history {

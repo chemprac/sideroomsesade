@@ -3,10 +3,15 @@
 import { useEffect, useState } from "react";
 import { adminFetch } from "@/lib/admin-client";
 import {
+  ARCHIVED_STAGES,
   CHANNEL_LABELS,
+  formatActionDate,
   formatTimestamp,
+  initiativeMethodLabel,
+  isArchivedStage,
   OUTREACH_CHANNELS,
   STAGE_LABELS,
+  type ArchivedStage,
   type OutreachChannel,
   type OutreachLead,
 } from "@/lib/outreach-pipeline";
@@ -27,7 +32,9 @@ export function PipelineLeadPanel({
   const [channel, setChannel] = useState<OutreachChannel | "">(lead.channel ?? "");
   const [nextActionDate, setNextActionDate] = useState(lead.next_action_date ?? "");
   const [nextActionNote, setNextActionNote] = useState(lead.next_action_note ?? "");
+  const [archiveStage, setArchiveStage] = useState<ArchivedStage>("closed_lost");
   const [saving, setSaving] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,6 +62,27 @@ export function PipelineLeadPanel({
       setError(e instanceof Error ? e.message : "Save failed");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const markArchived = async () => {
+    setArchiving(true);
+    setError(null);
+    try {
+      const res = await adminFetch(secret, `/api/admin/outreach-leads/${lead.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          stage: archiveStage,
+          next_action_note: nextActionNote.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Could not archive lead");
+      onSaved(data.lead);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not archive lead");
+    } finally {
+      setArchiving(false);
     }
   };
 
@@ -160,6 +188,54 @@ export function PipelineLeadPanel({
         >
           {saving ? "Saving…" : "Save"}
         </button>
+
+        {!isArchivedStage(lead.stage) ? (
+          <div className="pipeline-panel-section pipeline-panel-archive">
+            <div className="pipeline-panel-label">Close or mark dormant</div>
+            <p className="pipeline-panel-archive-hint">
+              Add a reason in the note above, then move this contact off the board.
+            </p>
+            <select
+              className="pipeline-panel-input"
+              value={archiveStage}
+              onChange={(e) => setArchiveStage(e.target.value as ArchivedStage)}
+            >
+              {ARCHIVED_STAGES.map((stage) => (
+                <option key={stage} value={stage}>
+                  {STAGE_LABELS[stage]}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="pipeline-panel-archive-btn"
+              onClick={markArchived}
+              disabled={archiving || !nextActionNote.trim()}
+            >
+              {archiving ? "Moving…" : `Mark as ${STAGE_LABELS[archiveStage].toLowerCase()}`}
+            </button>
+          </div>
+        ) : null}
+
+        <div className="pipeline-panel-history">
+          <div className="pipeline-panel-label">Sourcing initiative</div>
+          <div className="pipeline-panel-history-row">
+            <span>Initiative</span>
+            <span>{lead.initiative?.name ?? "—"}</span>
+          </div>
+          <div className="pipeline-panel-history-row">
+            <span>Method</span>
+            <span>{initiativeMethodLabel(lead.initiative?.method)}</span>
+          </div>
+          <div className="pipeline-panel-history-row">
+            <span>Started</span>
+            <span>
+              {lead.initiative?.started_at
+                ? formatActionDate(lead.initiative.started_at)
+                : "—"}
+            </span>
+          </div>
+        </div>
 
         <div className="pipeline-panel-history">
           <div className="pipeline-panel-label">Outreach history</div>

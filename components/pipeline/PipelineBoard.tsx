@@ -15,27 +15,32 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { adminFetch } from "@/lib/admin-client";
 import {
-  ARCHIVED_STAGES,
   BOARD_STAGES,
   CHANNEL_COLORS,
   CHANNEL_LABELS,
   formatActionDate,
+  isArchivedStage,
+  isBoardStage,
   isOverdueLead,
+  leadActivityTimestamp,
   OUTREACH_CHANNELS,
   STAGE_LABELS,
   todayDateString,
   type BoardStage,
   type OutreachChannel,
   type OutreachLead,
+  type SourcingInitiative,
 } from "@/lib/outreach-pipeline";
 import { PipelineLeadPanel } from "@/components/pipeline/PipelineLeadPanel";
 
 type PipelineBoardProps = {
   secret: string;
   initialLeads: OutreachLead[];
+  initialInitiatives: SourcingInitiative[];
 };
 
 type ChannelFilter = OutreachChannel | "all";
+type InitiativeFilter = "all" | string;
 
 function ActionStatus({ lead }: { lead: OutreachLead }) {
   const today = todayDateString();
@@ -64,6 +69,17 @@ function ChannelDot({ channel }: { channel: OutreachLead["channel"] }) {
         style={{ background: CHANNEL_COLORS[channel] }}
       />
       {CHANNEL_LABELS[channel]}
+    </span>
+  );
+}
+
+function InitiativePill({ initiative }: { initiative: OutreachLead["initiative"] }) {
+  if (!initiative) {
+    return <span className="pipeline-card-initiative pipeline-card-initiative--unset">No initiative</span>;
+  }
+  return (
+    <span className="pipeline-card-initiative" title={initiative.name}>
+      {initiative.name}
     </span>
   );
 }
@@ -103,6 +119,7 @@ function PipelineCard({
         {lead.title ?? "—"}
         {lead.company ? ` · ${lead.company}` : ""}
       </div>
+      <InitiativePill initiative={lead.initiative} />
       <div className="pipeline-card-footer">
         <ChannelDot channel={lead.channel} />
         <ActionStatus lead={lead} />
@@ -137,11 +154,17 @@ function PipelineColumn({
   );
 }
 
-export function PipelineBoard({ secret, initialLeads }: PipelineBoardProps) {
+export function PipelineBoard({
+  secret,
+  initialLeads,
+  initialInitiatives,
+}: PipelineBoardProps) {
   const [leads, setLeads] = useState(initialLeads);
+  const [initiatives] = useState(initialInitiatives);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<OutreachLead | null>(null);
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>("all");
+  const [initiativeFilter, setInitiativeFilter] = useState<InitiativeFilter>("all");
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -152,47 +175,58 @@ export function PipelineBoard({ secret, initialLeads }: PipelineBoardProps) {
   const filteredLeads = useMemo(() => {
     return leads.filter((lead) => {
       if (channelFilter !== "all" && lead.channel !== channelFilter) return false;
+      if (initiativeFilter !== "all" && lead.initiative_id !== initiativeFilter) {
+        return false;
+      }
       if (overdueOnly && !isOverdueLead(lead)) return false;
       return true;
     });
-  }, [leads, channelFilter, overdueOnly]);
+  }, [leads, channelFilter, initiativeFilter, overdueOnly]);
+
+  const statsLeads = useMemo(() => {
+    if (initiativeFilter === "all") return leads;
+    return leads.filter((lead) => lead.initiative_id === initiativeFilter);
+  }, [leads, initiativeFilter]);
+
+  const selectedInitiativeName = useMemo(() => {
+    if (initiativeFilter === "all") return null;
+    return initiatives.find((i) => i.id === initiativeFilter)?.name ?? null;
+  }, [initiativeFilter, initiatives]);
 
   const leadsByStage = useMemo(() => {
     const map = Object.fromEntries(
       BOARD_STAGES.map((s) => [s, [] as OutreachLead[]])
     ) as Record<BoardStage, OutreachLead[]>;
     for (const lead of filteredLeads) {
-      const stage = BOARD_STAGES.includes(lead.stage as BoardStage)
-        ? (lead.stage as BoardStage)
-        : "sourced";
-      map[stage].push(lead);
+      if (!isBoardStage(lead.stage)) continue;
+      map[lead.stage].push(lead);
     }
     return map;
   }, [filteredLeads]);
 
-  const archivedLeads = useMemo(
-    () =>
-      leads.filter((l) =>
-        (ARCHIVED_STAGES as readonly string[]).includes(l.stage)
-      ),
-    [leads]
-  );
+  const archivedLeads = useMemo(() => {
+    const archived = leads
+      .filter((l) => isArchivedStage(l.stage))
+      .sort((a, b) => leadActivityTimestamp(b) - leadActivityTimestamp(a));
+    if (initiativeFilter === "all") return archived;
+    return archived.filter((l) => l.initiative_id === initiativeFilter);
+  }, [leads, initiativeFilter]);
 
   const columnCounts = useMemo(() => {
     const counts = Object.fromEntries(
       BOARD_STAGES.map((s) => [s, 0])
     ) as Record<BoardStage, number>;
-    for (const lead of leads) {
-      if (BOARD_STAGES.includes(lead.stage as BoardStage)) {
-        counts[lead.stage as BoardStage] += 1;
+    for (const lead of statsLeads) {
+      if (isBoardStage(lead.stage)) {
+        counts[lead.stage] += 1;
       }
     }
     return counts;
-  }, [leads]);
+  }, [statsLeads]);
 
   const overdueTotal = useMemo(
-    () => leads.filter((l) => isOverdueLead(l)).length,
-    [leads]
+    () => statsLeads.filter((l) => isOverdueLead(l)).length,
+    [statsLeads]
   );
 
   const activeLead = activeId ? leads.find((l) => l.id === activeId) : null;
@@ -244,6 +278,12 @@ export function PipelineBoard({ secret, initialLeads }: PipelineBoardProps) {
   return (
     <div className="pipeline-board-wrap">
       <div className="pipeline-stats">
+        {selectedInitiativeName ? (
+          <div className="pipeline-stats-initiative">
+            <span className="pipeline-stats-initiative-label">Initiative</span>
+            <span className="pipeline-stats-initiative-name">{selectedInitiativeName}</span>
+          </div>
+        ) : null}
         <div className="pipeline-stats-overdue">
           <span className="pipeline-stats-overdue-num">{overdueTotal}</span>
           <span className="pipeline-stats-overdue-label">overdue actions</span>
@@ -256,10 +296,28 @@ export function PipelineBoard({ secret, initialLeads }: PipelineBoardProps) {
             </div>
           ))}
         </div>
-        <div className="pipeline-stats-total">{leads.length} contacts</div>
+        <div className="pipeline-stats-total">
+          {statsLeads.length} contacts
+          {initiativeFilter !== "all" ? " in initiative" : ""}
+        </div>
       </div>
 
       <div className="pipeline-filters">
+        <label className="pipeline-filter-label">
+          Initiative
+          <select
+            className="pipeline-filter-select"
+            value={initiativeFilter}
+            onChange={(e) => setInitiativeFilter(e.target.value)}
+          >
+            <option value="all">All initiatives</option>
+            {initiatives.map((init) => (
+              <option key={init.id} value={init.id}>
+                {init.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="pipeline-filter-label">
           Channel
           <select
@@ -334,6 +392,9 @@ export function PipelineBoard({ secret, initialLeads }: PipelineBoardProps) {
                   {STAGE_LABELS[lead.stage]}
                   {lead.company ? ` · ${lead.company}` : ""}
                 </span>
+                {lead.next_action_note ? (
+                  <span className="pipeline-archived-reason">{lead.next_action_note}</span>
+                ) : null}
               </button>
             </li>
           ))}
