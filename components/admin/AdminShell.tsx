@@ -118,14 +118,23 @@ export function AdminShell({ secret, onLogout }: AdminShellProps) {
                 </p>
               )}
             </div>
-            <button
-              type="button"
-              className="btn-secondary"
-              style={{ fontSize: 10, padding: "8px 12px" }}
-              onClick={onLogout}
-            >
-              Log out
-            </button>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <a
+                href="/admin/pipeline"
+                className="btn-secondary"
+                style={{ fontSize: 10, padding: "8px 12px", textDecoration: "none" }}
+              >
+                Pipeline
+              </a>
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ fontSize: 10, padding: "8px 12px" }}
+                onClick={onLogout}
+              >
+                Log out
+              </button>
+            </div>
           </div>
           {selectedSlug && (
             <div className="admin-tabs">
