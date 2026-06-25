@@ -42,11 +42,17 @@ const COLORS = {
   grey: "#888780",
 };
 
+const EVENT_SLUG = "fintech-marketing-hub-london-2026";
+
+function personSearchHref(name: string): string {
+  return `/${EVENT_SLUG}/people?search=${encodeURIComponent(name)}`;
+}
+
 const stats = [
-  { num: "75", label: "Registered attendees" },
+  { num: "83", label: "Registered attendees" },
+  { num: "83", label: "People profiled" },
   { num: "18", label: "Speakers on stage" },
-  { num: "4", label: "Panels + masterclass" },
-  { num: "5,000+", label: "FMH community size" },
+  { num: "38", label: "High-fit matches" },
 ];
 
 const signals = [
@@ -54,13 +60,80 @@ const signals = [
   "CMO · VP Marketing · Head of Brand",
   "Networking drinks from 5pm",
   "Breakfast + lunch included",
+  "5,000+ FMH community",
 ];
 
-const EVENT_SLUG = "fintech-marketing-hub-london-2026";
+const icpSnapshot = [
+  {
+    num: "38",
+    label: "Potential clients (score ≥ 75)",
+    href: `/${EVENT_SLUG}/people?icp=potential_client`,
+    dark: true,
+  },
+  {
+    num: "38",
+    label: "Potential partners (score ≥ 75)",
+    href: `/${EVENT_SLUG}/people?icp=potential_partner`,
+    dark: false,
+  },
+] as const;
 
-function personSearchHref(name: string): string {
-  return `/${EVENT_SLUG}/people?search=${encodeURIComponent(name)}`;
-}
+const topClientMatches = [
+  {
+    name: "Lauren Berkemeyer",
+    role: "CMO · YuLife",
+    hook: "Executive insurtech CMO — potential fractional CMO client",
+  },
+  {
+    name: "Nicola Wee",
+    role: "CMO · Aveni",
+    hook: "Growth-stage fintech CMO (recently enriched)",
+  },
+  {
+    name: "Adam Chapman",
+    role: "CMO · Confirmo",
+    hook: "On-stage speaker; marketing leadership gap",
+  },
+  {
+    name: "Jessica Rhodes",
+    role: "Global Marketing Dir · Paysecure",
+    hook: "Scaling marketing at payments brand",
+  },
+];
+
+const topPartnerMatches = [
+  {
+    name: "Helene Sourdeau",
+    role: "Co-Chair · Fintech B2B Marketing Community",
+    hook: "Network of ideal client CMOs",
+  },
+  {
+    name: "Ali Paterson",
+    role: "Founder · FF News",
+    hook: "Fintech media / lead-gen partner",
+  },
+  {
+    name: "Sam Boboev",
+    role: "Founder · Fintech Wrap Up",
+    hook: "Community + content partner",
+  },
+  {
+    name: "Rebecca Flinders-Robson",
+    role: "Content & Brand Lead · Paysecure",
+    hook: "Brand-side operator (new attendee)",
+  },
+];
+
+const topClientCompanies = [
+  { name: "YouLend", score: 90 },
+  { name: "Allica Bank", score: 90 },
+  { name: "ClearBank", score: 90 },
+];
+
+const topPartnerCompanies = [
+  { name: "Fintech B2B Marketing Community", score: 95 },
+  { name: "FF News | Fintech Finance", score: 95 },
+];
 
 const agenda = [
   {
@@ -198,7 +271,7 @@ const speakers = [
 const kathrinAngles = [
   {
     title: "Opportunity",
-    copy: "This room has a high density of senior marketers at Series A-C fintechs — exactly the companies that need a fractional CMO but haven't hired one yet.",
+    copy: "Among 83 profiled attendees, senior marketers at Series A–C fintechs dominate — exactly the companies that need a fractional CMO but haven't hired one yet.",
   },
   {
     title: "Who to find",
@@ -320,10 +393,34 @@ export default function FintechMarketingSummerConBriefing() {
               color: COLORS.muted,
               fontSize: 16,
               lineHeight: 1.5,
-              margin: 0,
+              margin: "0 0 14px",
             }}
           >
             30 June · The Trampery Old Street, London
+          </p>
+          <p
+            style={{
+              color: COLORS.muted,
+              fontSize: 15,
+              lineHeight: 1.55,
+              margin: 0,
+              maxWidth: 640,
+            }}
+          >
+            We profiled all{" "}
+            <strong style={{ color: COLORS.ink, fontWeight: 600 }}>83</strong>{" "}
+            registered attendees, scored{" "}
+            <strong style={{ color: COLORS.ink, fontWeight: 600 }}>23</strong>{" "}
+            companies, and ranked everyone against Kathrin&apos;s two goals —
+            growth-stage{" "}
+            <strong style={{ color: COLORS.ink, fontWeight: 600 }}>
+              potential clients
+            </strong>{" "}
+            and{" "}
+            <strong style={{ color: COLORS.ink, fontWeight: 600 }}>
+              marketing partners
+            </strong>{" "}
+            — so she knows who to prioritise before walking in.
           </p>
         </header>
 
@@ -400,6 +497,171 @@ export default function FintechMarketingSummerConBriefing() {
               {signal}
             </span>
           ))}
+        </section>
+
+        <section
+          aria-label="Match snapshot"
+          style={{
+            borderBottom: `1px solid ${COLORS.border}`,
+            padding: "24px",
+            background: COLORS.aged,
+          }}
+        >
+          <SectionLabel>Match snapshot</SectionLabel>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: 10,
+              marginBottom: 20,
+            }}
+          >
+            {icpSnapshot.map((cell) => (
+              <Link
+                key={cell.label}
+                href={cell.href}
+                style={{ textDecoration: "none", color: "inherit" }}
+              >
+                <article
+                  style={{
+                    border: `1px solid ${COLORS.border}`,
+                    background: cell.dark ? COLORS.ink : COLORS.parchment,
+                    color: cell.dark ? COLORS.parchment : COLORS.ink,
+                    padding: "16px 18px",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontFamily: "'Playfair Display', serif",
+                      fontSize: 36,
+                      lineHeight: 1,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {cell.num}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: "'DM Mono', monospace",
+                      fontSize: 10,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      color: cell.dark ? COLORS.border : COLORS.muted,
+                      marginTop: 6,
+                    }}
+                  >
+                    {cell.label}
+                  </div>
+                </article>
+              </Link>
+            ))}
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: 16,
+              marginBottom: 20,
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: 9,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em",
+                  color: COLORS.amber,
+                  marginBottom: 10,
+                }}
+              >
+                Top potential clients
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {topClientMatches.map((person) => (
+                  <MatchPreviewRow key={person.name} {...person} />
+                ))}
+              </div>
+            </div>
+            <div>
+              <div
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: 9,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em",
+                  color: COLORS.amber,
+                  marginBottom: 10,
+                }}
+              >
+                Top potential partners
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {topPartnerMatches.map((person) => (
+                  <MatchPreviewRow key={person.name} {...person} />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: 16,
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: 9,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em",
+                  color: COLORS.amber,
+                  marginBottom: 10,
+                }}
+              >
+                Top client companies
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                {topClientCompanies.map((company) => (
+                  <CompanyScoreBar
+                    key={company.name}
+                    name={company.name}
+                    score={company.score}
+                    href={`/${EVENT_SLUG}/companies?icp=potential_client`}
+                  />
+                ))}
+              </div>
+            </div>
+            <div>
+              <div
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: 9,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em",
+                  color: COLORS.amber,
+                  marginBottom: 10,
+                }}
+              >
+                Top partner companies
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                {topPartnerCompanies.map((company) => (
+                  <CompanyScoreBar
+                    key={company.name}
+                    name={company.name}
+                    score={company.score}
+                    href={`/${EVENT_SLUG}/companies?icp=potential_partner`}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
         </section>
 
         <section
@@ -829,5 +1091,118 @@ function LegendRow({
         {pct}
       </span>
     </div>
+  );
+}
+
+function MatchPreviewRow({
+  name,
+  role,
+  hook,
+}: {
+  name: string;
+  role: string;
+  hook: string;
+}) {
+  return (
+    <Link
+      href={personSearchHref(name)}
+      style={{ textDecoration: "none", color: "inherit" }}
+    >
+      <article
+        style={{
+          border: `1px solid ${COLORS.border}`,
+          background: COLORS.parchment,
+          padding: "10px 12px",
+        }}
+      >
+        <div
+          style={{
+            fontFamily: "'Playfair Display', serif",
+            fontSize: 16,
+            fontWeight: 600,
+            lineHeight: 1.2,
+            borderBottom: `1px solid ${COLORS.amber}`,
+            display: "inline",
+          }}
+        >
+          {name}
+        </div>
+        <div
+          style={{
+            fontFamily: "'DM Mono', monospace",
+            fontSize: 10,
+            textTransform: "uppercase",
+            letterSpacing: "0.05em",
+            color: COLORS.muted,
+            marginTop: 4,
+          }}
+        >
+          {role}
+        </div>
+        <p
+          style={{
+            fontSize: 12,
+            lineHeight: 1.45,
+            color: COLORS.ink,
+            margin: "6px 0 0",
+          }}
+        >
+          {hook}
+        </p>
+      </article>
+    </Link>
+  );
+}
+
+function CompanyScoreBar({
+  name,
+  score,
+  href,
+}: {
+  name: string;
+  score: number;
+  href: string;
+}) {
+  return (
+    <Link href={href} style={{ textDecoration: "none", color: "inherit" }}>
+      <div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 12,
+            fontSize: 12,
+            marginBottom: 4,
+          }}
+        >
+          <span>{name}</span>
+          <span
+            style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: 10,
+              color: COLORS.muted,
+            }}
+          >
+            {score}
+          </span>
+        </div>
+        <div
+          style={{
+            height: 6,
+            width: "100%",
+            background: COLORS.parchment,
+            border: `1px solid ${COLORS.border}`,
+          }}
+        >
+          <div
+            style={{
+              width: `${score}%`,
+              height: "100%",
+              background: COLORS.amber,
+            }}
+          />
+        </div>
+      </div>
+    </Link>
   );
 }
