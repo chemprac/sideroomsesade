@@ -45,6 +45,11 @@ IDENTITY_WEEK_URL_OVERRIDES: dict[str, UrlOverride] = {
         "linkedin_url": None,
         "note": "Was sorellanza.club — unverified. No official site found; skip website crawl.",
     },
+    "Aveni": {
+        "website_url": "https://aveni.ai",
+        "linkedin_url": "https://www.linkedin.com/company/aveni-ai",
+        "note": "Was hatch-ai (wrong entity). Financial-services AI company.",
+    },
 }
 
 # Domains that should never be accepted for any company (Apollo false positives)

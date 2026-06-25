@@ -79,7 +79,7 @@ LINKEDIN SUMMARY:
 Return ONLY valid JSON — no markdown, no preamble:
 
 {{
-  "what_they_do": "2-3 sentence plain English description of what this company does and who their customers are",
+  "what_they_do": "2-3 short bullet phrases (max 10 words each) describing what this company does and who their customers are — return as one string with · between bullets",
   "hq": "City, Country — use known HQ above if provided",
   "headcount_band": "use known headcount_band above if provided, otherwise one of: 1-10, 10-50, 50-200, 200-1000, 1000+",
   "stage": "one of: startup, scaleup, enterprise, government, academic",
@@ -133,12 +133,14 @@ RULES:
 3. Missing or thin website summary → set review_status = "needs_review" and note limited sources in review_reason.
 4. When website is unavailable, infer what_they_do from news/LinkedIn only — be conservative; lower icp_scores if evidence is thin.
 5. proof_points from summaries only — return [] if nothing specific found.
-6. hook sentences must be specific — never "great potential partner".
-7. Score companies for {client_name}'s stated goal, not for physical authentication, security pigments, pharma, luxury, or Identity Week.
-8. Do not mention Distinkt, Sotheby's, Philip Morris, physical authentication, security pigments, pharma, or luxury unless they appear in the company source summaries.
-9. is_competitor = true only if they directly compete with {client_name}'s senior fintech marketing advisory/fractional CMO work.
-10. Write conversation_hook values as ready-to-say questions from {client_name} to someone at the company. Do not start with "{client_name}," or refer to {client_name} in the third person.
-11. Escape backslashes and quotes properly in JSON strings."""
+6. hook sentences must be specific — never "great potential partner". Max 10 words per phrase.
+7. why_this_match and conversation_hook: max 10 words per phrase; use · to separate if multiple ideas.
+8. proof_points headlines max 10 words; relevance max 10 words.
+9. Score companies for {client_name}'s stated goal, not for physical authentication, security pigments, pharma, luxury, or Identity Week.
+10. Do not mention Distinkt, Sotheby's, Philip Morris, physical authentication, security pigments, pharma, or luxury unless they appear in the company source summaries.
+11. is_competitor = true only if they directly compete with {client_name}'s senior fintech marketing advisory/fractional CMO work.
+12. Write conversation_hook values as ready-to-say questions from {client_name} to someone at the company. Do not start with "{client_name}," or refer to {client_name} in the third person.
+13. Escape backslashes and quotes properly in JSON strings."""
 
     try:
         raw = call_gemini(prompt, max_tokens=4000)

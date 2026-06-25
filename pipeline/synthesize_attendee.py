@@ -80,6 +80,13 @@ Return ONLY valid JSON — no markdown, no preamble:
   ],
   "relevance_to_client": "one sentence under 15 words — why is this person worth {client_name}'s time",
   "relevance_to_distinkt": "same value as relevance_to_client, kept for compatibility",
+  "person_priorities": [
+    "2-3 short phrases — this person's strategic priorities right now (what they're trying to achieve in role, e.g. scale DACH brand, build pipeline, launch new product line)"
+  ],
+  "person_signals": [
+    {{"label": "2-4 word category e.g. LinkedIn, Hiring, Panel", "text": "concrete recent signal about this person under 20 words"}},
+    {{"label": "...", "text": "..."}}
+  ],
   "marketing_signal": "ONE line max 15 words — the single most concrete recent hook for a marketer to use (funding round, acquisition, CEO quote topic, DACH expansion, rebrand, hiring marketing, panel topic). Must cite a fact from the sources. Never generic.",
   "is_speaker": false,
   "session_info": null
@@ -97,8 +104,10 @@ RULES:
 9. seniority: executive = C-suite, MD, Director, VP. founder = self-employed/founder. senior = manager, head of, lead. mid = specialist, analyst, consultant. junior = coordinator, assistant, intern
 10. is_speaker = true only if SPEAKER INFO above is not "Not a speaker"
 11. session_info = null if not a speaker
-12. Do not mention Distinkt, Identity Week, Sotheby's, Philip Morris, physical authentication, security pigments, pharma, or luxury unless they appear in the person's own profile/company context.
-13. Escape backslashes and quotes properly in JSON strings."""
+12. person_priorities = what THIS PERSON is driving (role mandate, public goals) — not company-level unless they own it
+13. person_signals = recent person-specific hooks from LinkedIn posts, news, or title changes — never duplicate company funding unless they posted about it
+14. Do not mention Distinkt, Identity Week, Sotheby's, Philip Morris, physical authentication, security pigments, pharma, or luxury unless they appear in the person's own profile/company context.
+15. Escape backslashes and quotes properly in JSON strings."""
 
     try:
         raw = call_gemini(prompt, max_tokens=3000)

@@ -6,6 +6,10 @@ import {
 import { parseClientProfile } from "@/lib/client-overlap";
 import { isClientSelf, pickMarketingSignal } from "@/lib/marketing-signal";
 import { parseEventConfig, type UserContext } from "@/lib/event-config";
+import {
+  buildPersonCardIntel,
+  type PersonCardIntel,
+} from "@/lib/person-card-intel";
 
 type SupabaseClient = ReturnType<typeof createServerClient>;
 
@@ -27,7 +31,11 @@ export type ApproachIntel = {
   areas_of_expertise?: string[];
   functional_expertise?: string[];
   match_context?: string;
+  person_priorities?: string[];
+  person_signals?: { label: string; text: string }[];
 };
+
+export type { PersonCardIntel };
 
 export type PersonMatchRow = {
   id: string;
@@ -48,6 +56,7 @@ export type PersonMatchRow = {
   tags: string[];
   marketing_signal: string | null;
   enriching: boolean;
+  card_intel: PersonCardIntel | null;
 };
 
 const SENIORITY_ORDER: Record<string, number> = {
@@ -205,7 +214,7 @@ export async function fetchPeopleMatches(
     supabase
       .from("company_profiles")
       .select(
-        "company_name, icp_scores, review_status, company_type, competitor_signal, hook, conversation_hook, proof_points, signals"
+        "company_name, icp_scores, review_status, company_type, competitor_signal, hook, why_this_match, conversation_hook, proof_points, signals, what_they_do, momentum"
       )
       .eq("event_slug", eventSlug)
       .eq("review_status", "approved"),
@@ -346,6 +355,15 @@ export async function fetchPeopleMatches(
 
     const hasIntel = Boolean(marketingSignal || approachIntel?.best_approach || meta.open_with);
 
+    const cardIntel = buildPersonCardIntel({
+      seniority,
+      icp,
+      companyProfile,
+      approachIntel,
+      marketingSignal,
+      postsSummary: (profileRaw?.linkedin_posts_summary as string | null) ?? null,
+    });
+
     return {
       id: attendeeId,
       name: row.name as string,
@@ -371,6 +389,7 @@ export async function fetchPeopleMatches(
       tags: meta.tags,
       marketing_signal: marketingSignal,
       enriching: !hasIntel,
+      card_intel: cardIntel,
     };
   });
 

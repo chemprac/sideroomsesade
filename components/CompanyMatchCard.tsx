@@ -13,6 +13,10 @@ import {
   matchBadgeLevel,
 } from "@/lib/company-matches";
 import { formatCompanyTypeLabel } from "@/lib/event-config";
+import {
+  proofPointBullets,
+  proseToBullets,
+} from "@/lib/company-card-bullets";
 
 type CompanyMatchCardProps = {
   company: CompanyProfileRow;
@@ -35,6 +39,19 @@ function momentumLabel(momentum: string | null | undefined): string {
   return "LOW";
 }
 
+function BulletList({ items }: { items: string[] }) {
+  if (items.length === 0) {
+    return <p className="company-match-empty">—</p>;
+  }
+  return (
+    <ul className="company-match-bullets">
+      {items.map((item, i) => (
+        <li key={i}>{item}</li>
+      ))}
+    </ul>
+  );
+}
+
 export function CompanyMatchCard({
   company,
   rank,
@@ -53,6 +70,12 @@ export function CompanyMatchCard({
   const whyMatch = jsonField(company.why_this_match, activeIcp);
   const convHook = jsonField(company.conversation_hook, activeIcp);
   const proofPoints = (company.proof_points ?? []).slice(0, 3);
+
+  const whatBullets = proseToBullets(company.what_they_do);
+  const whyBullets = proseToBullets(whyMatch);
+  const hookBullets = proseToBullets(convHook);
+  const proofBullets = proofPointBullets(proofPoints);
+  const headerHook = hook ? proseToBullets(hook, 10, 1)[0] ?? hook : null;
 
   const sector = formatCompanyTypeLabel(activeIcp);
   const hq = company.hq ?? "—";
@@ -83,7 +106,7 @@ export function CompanyMatchCard({
           <p className="company-match-meta">
             {sector} · {hq} · {attendees} attendee{attendees === 1 ? "" : "s"}
           </p>
-          {hook ? <p className="company-match-hook">{hook}</p> : null}
+          {headerHook ? <p className="company-match-hook">{headerHook}</p> : null}
         </div>
         <div className="company-match-card-aside">
           <span
@@ -105,36 +128,22 @@ export function CompanyMatchCard({
           <div className="company-match-columns">
             <div className="company-match-col">
               <div className="company-match-col-label">What they do</div>
-              <p>{company.what_they_do ?? "—"}</p>
+              <BulletList items={whatBullets} />
             </div>
             <div className="company-match-col">
               <div className="company-match-col-label">Why this match</div>
-              <p>{whyMatch || "—"}</p>
+              <BulletList items={whyBullets} />
             </div>
             <div className="company-match-col">
               <div className="company-match-col-label">Conversation hook</div>
-              <p>{convHook || "—"}</p>
+              <BulletList items={hookBullets} />
             </div>
           </div>
 
-          {proofPoints.length > 0 ? (
+          {proofBullets.length > 0 ? (
             <div className="company-match-proof">
               <div className="company-match-proof-label">Proof points</div>
-              <div className="company-match-proof-list">
-                {proofPoints.map((pt, i) => (
-                  <div key={i} className="company-match-proof-item">
-                    {pt.date ? (
-                      <div className="company-match-proof-date">{pt.date}</div>
-                    ) : null}
-                    {pt.headline ? (
-                      <div className="company-match-proof-headline">{pt.headline}</div>
-                    ) : null}
-                    {pt.relevance ? (
-                      <div className="company-match-proof-relevance">{pt.relevance}</div>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
+              <BulletList items={proofBullets} />
             </div>
           ) : null}
 

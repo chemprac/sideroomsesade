@@ -154,6 +154,58 @@ function formatSession(day: number | null, time: string | null): string | null {
   return `Day ${day} · ${time}`;
 }
 
+function IntelSignalList({ signals }: { signals: { label: string; text: string }[] }) {
+  if (signals.length === 0) return null;
+  return (
+    <ul className="person-match-signal-list">
+      {signals.map((s, i) => (
+        <li key={`${s.label}-${i}`} className="person-match-signal-item">
+          <span className="person-match-signal-tag">{s.label}</span>
+          <span>{s.text}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function PriorityList({ items }: { items: string[] }) {
+  if (items.length === 0) return null;
+  return (
+    <ul className="person-match-priority-list">
+      {items.map((item, i) => (
+        <li key={i}>{item}</li>
+      ))}
+    </ul>
+  );
+}
+
+function SeniorIntelPanel({ intel }: { intel: NonNullable<PersonMatchRow["card_intel"]> }) {
+  const hasCompany = Boolean(intel.company_priority || intel.company_signals.length);
+  const hasPerson = Boolean(intel.person_priorities.length || intel.person_signals.length);
+  if (!hasCompany && !hasPerson) return null;
+
+  return (
+    <div className="person-match-dual-intel">
+      <div className="person-match-dual-col">
+        <div className="person-match-col-label">Company</div>
+        {intel.company_priority ? (
+          <p className="person-match-priority-lead">{intel.company_priority}</p>
+        ) : (
+          <p className="person-match-priority-lead person-match-priority-lead--muted">
+            Company intel enriching…
+          </p>
+        )}
+        <IntelSignalList signals={intel.company_signals} />
+      </div>
+      <div className="person-match-dual-col">
+        <div className="person-match-col-label">Person</div>
+        <PriorityList items={intel.person_priorities} />
+        <IntelSignalList signals={intel.person_signals} />
+      </div>
+    </div>
+  );
+}
+
 export function PersonMatchCard({
   person,
   rank,
@@ -176,6 +228,8 @@ export function PersonMatchCard({
   const areas = parseStringList(intel?.areas_of_expertise);
   const functions = parseStringList(intel?.functional_expertise);
   const decision = parseDecisionPower(intel);
+  const cardIntel = person.card_intel;
+  const isSeniorLayout = Boolean(cardIntel);
   const hasExpandable = Boolean(bestApproach || talkingPoints.length > 0);
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -285,24 +339,26 @@ export function PersonMatchCard({
           />
         ) : null}
 
-        {oneLiner ? (
+        {oneLiner && !isSeniorLayout ? (
           <p className="person-match-oneliner">{oneLiner}</p>
         ) : null}
 
-        {areas.length > 0 || functions.length > 0 ? (
+        {!isSeniorLayout && (areas.length > 0 || functions.length > 0) ? (
           <div className="person-match-expertise">
             <ExpertiseSection label="Domain" items={areas} variant="domain" />
             <ExpertiseSection label="Function" items={functions} variant="function" />
           </div>
         ) : null}
 
-        {person.marketing_signal ? (
+        {isSeniorLayout && cardIntel ? <SeniorIntelPanel intel={cardIntel} /> : null}
+
+        {!isSeniorLayout && person.marketing_signal ? (
           <p className="person-match-signal">{person.marketing_signal}</p>
-        ) : person.enriching ? (
+        ) : !isSeniorLayout && person.enriching ? (
           <p className="person-match-enriching">Profile enriching…</p>
         ) : null}
 
-        {relevance ? (
+        {!isSeniorLayout && relevance ? (
           <p className="person-match-relevance">{relevance}</p>
         ) : null}
 
