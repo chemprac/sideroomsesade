@@ -11,6 +11,9 @@ def parse_pipeline_args(argv=None):
         "event_slug": None,
         "company": None,
         "limit": None,
+        "companies_file": None,
+        "no_skip_crawled": False,
+        "clear_premature_synthesis": False,
     }
     for i, a in enumerate(args):
         if a == "--test":
@@ -31,6 +34,12 @@ def parse_pipeline_args(argv=None):
             except ValueError:
                 print(f"ERROR: --limit must be an integer, got {args[i + 1]!r}")
                 sys.exit(1)
+        elif a == "--companies-file" and i + 1 < len(args):
+            opts["companies_file"] = args[i + 1]
+        elif a == "--no-skip-crawled":
+            opts["no_skip_crawled"] = True
+        elif a == "--clear-premature-synthesis":
+            opts["clear_premature_synthesis"] = True
     if not opts["event_slug"]:
         print("ERROR: --event is required")
         sys.exit(1)

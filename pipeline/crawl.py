@@ -1,43 +1,52 @@
 import re
+from typing import Optional
 from urllib.parse import urlparse
 
 from apify_client import ApifyClient
 
 from pipeline.config import (
     APIFY_API_TOKEN,
-    CAREER_URL,
     CHARS_PER_PAGE,
-    EXCLUDE_URL_GLOBS,
-    HIRING_BODY,
     MAX_CRAWL_DEPTH,
     MAX_RANKED_CHARS,
     MAX_WEBSITE_PAGES,
-    NOISE_BODY,
-    NOISE_URL,
-    RELEVANT_BODY,
-    RELEVANT_URL,
     TOP_CAREER_PAGES,
     TOP_PRODUCT_PAGES,
 )
+from pipeline.crawl_config import CrawlProfile, get_crawl_profile
 
 apify = ApifyClient(APIFY_API_TOKEN)
 
+# Populated during batch runs for reporting.
+LAST_CRAWL_RUN_IDS: list[str] = []
+LAST_CRAWL_ACTOR_CALLS = 0
+LAST_CRAWL_RENDER_STATS: dict[str, int] = {}
 
-def score_page(url: str, text: str) -> float:
+
+def normalize_host(url: str) -> str:
+    if not url:
+        return ""
+    host = urlparse(url).netloc.lower()
+    if host.startswith("www."):
+        host = host[4:]
+    return host
+
+
+def score_page(url: str, text: str, profile: CrawlProfile) -> float:
     path = urlparse(url).path.lower()
     score = 0.0
     if path in ("", "/"):
         score += 2
-    if RELEVANT_URL.search(path):
+    if profile.relevant_url.search(path):
         score += 5
-    if CAREER_URL.search(path):
+    if profile.career_url.search(path):
         score += 2
-    if NOISE_URL.search(path):
+    if profile.noise_url.search(path):
         score -= 10
-    score += min(len(RELEVANT_BODY.findall(text)) * 0.5, 6)
-    if HIRING_BODY.search(text):
+    score += min(len(profile.relevant_body.findall(text)) * 0.5, 6)
+    if profile.hiring_body.search(text):
         score += 2
-    if NOISE_BODY.search(text[:500]):
+    if profile.noise_body.search(text[:500]):
         score -= 2
     if len(text) < 200:
         score -= 3
@@ -46,11 +55,12 @@ def score_page(url: str, text: str) -> float:
     return score
 
 
-def is_career_page(url: str) -> bool:
-    return bool(CAREER_URL.search(urlparse(url).path))
+def is_career_page(url: str, profile: CrawlProfile) -> bool:
+    return bool(profile.career_url.search(urlparse(url).path))
 
 
-def rank_page_items(items: list) -> tuple:
+def rank_page_items(items: list, profile: Optional[CrawlProfile] = None) -> tuple:
+    profile = profile or get_crawl_profile(None)
     scored = []
     seen = set()
     for item in items:
@@ -62,7 +72,9 @@ def rank_page_items(items: list) -> tuple:
         if key in seen:
             continue
         seen.add(key)
-        scored.append((score_page(url, text), url, text, is_career_page(url)))
+        scored.append(
+            (score_page(url, text, profile), url, text, is_career_page(url, profile))
+        )
     return _build_ranked_and_raw(scored)
 
 
@@ -83,8 +95,9 @@ def parse_raw_crawl(raw: str) -> list:
     return items
 
 
-def rank_from_raw(raw: str) -> tuple:
-    return rank_page_items(parse_raw_crawl(raw))
+def rank_from_raw(raw: str, event_slug: Optional[str] = None) -> tuple:
+    profile = get_crawl_profile(event_slug)
+    return rank_page_items(parse_raw_crawl(raw), profile)
 
 
 def _build_ranked_and_raw(scored: list) -> tuple:
@@ -121,31 +134,155 @@ def _build_ranked_and_raw(scored: list) -> tuple:
     return ranked, raw
 
 
-def fetch_website_crawl(website_url: str, company_name: str) -> tuple:
-    """Returns (ranked_text, raw_storage_text)."""
-    if not website_url:
-        print("    [website] No URL — skipping crawl")
-        return "", ""
+def _build_run_input(profile: CrawlProfile, start_urls: list[str]) -> dict:
+    run_input = {
+        "startUrls": [{"url": url} for url in start_urls],
+        "maxCrawlPages": len(start_urls) * MAX_WEBSITE_PAGES,
+        "maxCrawlDepth": MAX_CRAWL_DEPTH,
+        "crawlerType": profile.crawler_type,
+        "excludeUrlGlobs": profile.exclude_url_globs,
+        "removeElementsCssSelector": profile.remove_elements_css_selector,
+        "htmlTransformer": "readableText",
+        "maxConcurrency": profile.max_concurrency,
+        "initialConcurrency": profile.initial_concurrency,
+    }
+    if profile.include_url_globs:
+        run_input["includeUrlGlobs"] = profile.include_url_globs
+    return run_input
+
+
+def _fetch_run_stats(run_id: str) -> dict:
     try:
+        run = apify.run(run_id).get()
+        return run.get("stats") or {}
+    except Exception:
+        return {}
+
+
+def _collect_render_stats(items: list[dict], run_id: Optional[str] = None) -> dict[str, int]:
+    stats: dict[str, int] = {"http": 0, "browser": 0, "unknown": 0}
+    for item in items:
+        renderer = (
+            item.get("crawlerType")
+            or item.get("renderer")
+            or item.get("renderingType")
+            or (item.get("debug") or {}).get("requestHandlerMode")
+            or item.get("metadata", {}).get("renderer")
+            or item.get("metadata", {}).get("crawlerType")
+        )
+        if not renderer:
+            stats["unknown"] += 1
+            continue
+        lower = str(renderer).lower()
+        if "playwright" in lower or "firefox" in lower or "browser" in lower or "adaptive:browser" in lower:
+            stats["browser"] += 1
+        elif "cheerio" in lower or "http" in lower or "adaptive:http" in lower:
+            stats["http"] += 1
+        else:
+            stats["unknown"] += 1
+
+    if run_id:
+        run_stats = _fetch_run_stats(run_id)
+        for key, value in run_stats.items():
+            lower = str(key).lower()
+            if "playwright" in lower or "browser" in lower or "firefox" in lower:
+                if isinstance(value, (int, float)) and value > 0:
+                    stats["browser"] = max(stats["browser"], int(value))
+            if "cheerio" in lower or ("http" in lower and "browser" not in lower):
+                if isinstance(value, (int, float)) and value > 0:
+                    stats["http"] = max(stats["http"], int(value))
+    return stats
+
+
+def _merge_render_stats(into: dict[str, int], add: dict[str, int]) -> None:
+    for key, value in add.items():
+        into[key] = into.get(key, 0) + value
+
+
+def _assign_items_to_hosts(items: list[dict], host_to_name: dict[str, str]) -> dict[str, list]:
+    grouped: dict[str, list] = {name: [] for name in host_to_name.values()}
+    for item in items:
+        item_url = item.get("url") or item.get("loadedUrl") or ""
+        item_host = normalize_host(item_url)
+        if not item_host:
+            continue
+        matched = None
+        for host, name in host_to_name.items():
+            if item_host == host or item_host.endswith("." + host) or host.endswith("." + item_host):
+                matched = name
+                break
+        if matched:
+            grouped[matched].append(item)
+    return grouped
+
+
+def fetch_website_crawl_batch(
+    companies: list[dict],
+    event_slug: Optional[str] = None,
+) -> dict[str, tuple[str, str]]:
+    """
+    Crawl many company websites in one or more Apify actor runs.
+    companies: [{company_name, website_url}, ...]
+    Returns {company_name: (ranked_text, raw_storage_text)}.
+    """
+    global LAST_CRAWL_ACTOR_CALLS, LAST_CRAWL_RUN_IDS, LAST_CRAWL_RENDER_STATS
+
+    profile = get_crawl_profile(event_slug)
+    results: dict[str, tuple[str, str]] = {}
+    pending = [c for c in companies if c.get("website_url")]
+    for c in companies:
+        if not c.get("website_url"):
+            results[c["company_name"]] = ("", "")
+
+    if not pending:
+        return results
+
+    batch_size = profile.website_crawl_batch_size
+    LAST_CRAWL_ACTOR_CALLS = 0
+    LAST_CRAWL_RUN_IDS = []
+    LAST_CRAWL_RENDER_STATS = {"http": 0, "browser": 0, "unknown": 0}
+
+    for offset in range(0, len(pending), batch_size):
+        chunk = pending[offset : offset + batch_size]
+        start_urls = [c["website_url"] for c in chunk]
+        host_to_name = {
+            normalize_host(c["website_url"]): c["company_name"] for c in chunk
+        }
         print(
-            f"    [website] Crawling {website_url} "
-            f"(depth={MAX_CRAWL_DEPTH}, exclude={len(EXCLUDE_URL_GLOBS)} patterns)..."
+            f"    [website] Batch crawl {offset + 1}-{offset + len(chunk)} "
+            f"({len(chunk)} sites, profile={profile.event_slug}, "
+            f"crawler={profile.crawler_type}, concurrency={profile.max_concurrency})..."
         )
-        run = apify.actor("apify/website-content-crawler").call(
-            run_input={
-                "startUrls": [{"url": website_url}],
-                "maxCrawlPages": MAX_WEBSITE_PAGES,
-                "maxCrawlDepth": MAX_CRAWL_DEPTH,
-                "crawlerType": "cheerio",
-                "excludeUrlGlobs": EXCLUDE_URL_GLOBS,
-                "removeElementsCssSelector": "nav, footer, header, .cookie-banner",
-                "htmlTransformer": "readableText",
-            }
-        )
+        run_input = _build_run_input(profile, start_urls)
+        run = apify.actor("apify/website-content-crawler").call(run_input=run_input)
+        LAST_CRAWL_ACTOR_CALLS += 1
+        LAST_CRAWL_RUN_IDS.append(run["id"])
+
         items = list(apify.dataset(run["defaultDatasetId"]).iterate_items())
-        ranked, raw = rank_page_items(items)
-        print(f"    [website] crawled {len(items)} pages total, raw {len(raw)} chars")
-        return ranked, raw
-    except Exception as e:
-        print(f"    [website] ERROR: {e}")
-        return "", ""
+        _merge_render_stats(LAST_CRAWL_RENDER_STATS, _collect_render_stats(items, run["id"]))
+        grouped = _assign_items_to_hosts(items, host_to_name)
+
+        for company in chunk:
+            name = company["company_name"]
+            company_items = grouped.get(name, [])
+            ranked, raw = rank_page_items(company_items, profile)
+            print(
+                f"    [website] {name}: {len(company_items)} pages, "
+                f"raw {len(raw)} chars"
+            )
+            results[name] = (ranked, raw)
+
+    return results
+
+
+def fetch_website_crawl(
+    website_url: str,
+    company_name: str,
+    event_slug: Optional[str] = None,
+) -> tuple:
+    """Single-company crawl (delegates to batch API)."""
+    results = fetch_website_crawl_batch(
+        [{"company_name": company_name, "website_url": website_url}],
+        event_slug,
+    )
+    return results.get(company_name, ("", ""))

@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import Optional, TypedDict
 
+from pipeline.url_utils import host_matches_fragment, url_hostname
+
 
 class UrlOverride(TypedDict, total=False):
     website_url: Optional[str]
@@ -52,7 +54,19 @@ IDENTITY_WEEK_URL_OVERRIDES: dict[str, UrlOverride] = {
     },
 }
 
-# Domains that should never be accepted for any company (Apollo false positives)
+SBC_URL_OVERRIDES: dict[str, UrlOverride] = {
+    "Grosvenor Casinos / Sports": {
+        "website_url": "https://www.grosvenorcasinos.com",
+        "linkedin_url": "https://www.linkedin.com/company/grosvenor-casinos",
+        "note": "Was compare.bet (affiliate). Rank Group Grosvenor Casinos brand.",
+    },
+    "720 Management Limited": {
+        "website_url": None,
+        "note": "Was noisyandco.com (exhibition booth builder, not the operator).",
+    },
+}
+
+# Domains that should never be accepted for any company (Apollo/Tavily false positives)
 REJECTED_DOMAINS = frozenset(
     {
         "bnwalls.com",
@@ -64,9 +78,44 @@ REJECTED_DOMAINS = frozenset(
         "tax-stamps.org",
         "www.tax-stamps.org",
         "sorellanza.club",
-        "reinitzinvestment",
-        "linkedin.com/company/reinitzinvestment",
-        "linkedin.com/company/signeasy",
+        # Social / redirect junk
+        "x.com",
+        "twitter.com",
+        "t.co",
+        # Directories and review sites
+        "tripadvisor.com",
+        "trustpilot.com",
+        "pitchbook.com",
+        "leadiq.com",
+        "siteconfiavel.com.br",
+        "sikayetvar.com",
+        "scam-detector.com",
+        "portaldaqueixa.com",
+        "prospeo.io",
+        "boardgamegeek.com",
+        # Industry listings (not company sites)
+        "casinocity.com",
+        "gamblinginsider.com",
+        "newbettingsites.uk",
+        "casinocanada.com",
+        "igamingbusiness.com",
+        "gamblinginvest.com",
+        # Registries / business listings
+        "find-and-update.company-information.service.gov.uk",
+        "companies-house.gov.uk",
+        "sgpbusiness.com",
+        "datocapital.mt",
+        # Generic hosts
+        "sites.google.com",
+        "refpajngpztu.top",
+        "compare.bet",
+        # Exhibition booth builders (not iGaming operators)
+        "noisyandco.com",
+        "www.noisyandco.com",
+        "boothconstructor.com",
+        "www.boothconstructor.com",
+        "beursstand.nl",
+        "www.beursstand.nl",
     }
 )
 
@@ -79,22 +128,27 @@ REJECTED_LINKEDIN_SLUGS = frozenset(
 
 
 def get_override(company_name: str) -> UrlOverride | None:
-    return IDENTITY_WEEK_URL_OVERRIDES.get(company_name)
+    return IDENTITY_WEEK_URL_OVERRIDES.get(company_name) or SBC_URL_OVERRIDES.get(
+        company_name
+    )
 
 
 def is_rejected_url(url: str) -> bool:
     if not url:
         return False
-    lower = url.lower()
-    return any(bad in lower for bad in REJECTED_DOMAINS)
+    host = url_hostname(url)
+    if not host:
+        return False
+    return any(host_matches_fragment(host, bad) for bad in REJECTED_DOMAINS)
 
 
 def is_rejected_linkedin(url: str) -> bool:
     if not url:
         return False
-    lower = url.lower()
-    if any(bad in lower for bad in REJECTED_DOMAINS):
+    host = url_hostname(url)
+    if host and any(host_matches_fragment(host, bad) for bad in REJECTED_DOMAINS):
         return True
+    lower = url.lower()
     for slug in REJECTED_LINKEDIN_SLUGS:
         if f"/company/{slug}" in lower:
             return True

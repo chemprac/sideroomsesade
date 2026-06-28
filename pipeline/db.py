@@ -122,11 +122,22 @@ def upsert_profile_fields(supabase: Client, event_slug: str, company_name: str, 
 
     if pipeline_columns_available(supabase):
         row.update(fields)
-        (
-            supabase.table("company_profiles")
-            .upsert(row, on_conflict="company_name,event_slug")
-            .execute()
-        )
+        try:
+            (
+                supabase.table("company_profiles")
+                .upsert(row, on_conflict="company_name,event_slug")
+                .execute()
+            )
+        except Exception as exc:
+            if "fallback_search" not in str(exc):
+                raise
+            for key in ("fallback_search_summary", "fallback_search_at"):
+                row.pop(key, None)
+            (
+                supabase.table("company_profiles")
+                .upsert(row, on_conflict="company_name,event_slug")
+                .execute()
+            )
         return
 
     existing = get_profile(supabase, event_slug, company_name)

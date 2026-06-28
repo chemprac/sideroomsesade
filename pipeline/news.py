@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 
 import requests
@@ -36,23 +38,42 @@ def fetch_news(company_name: str) -> list:
         return []
 
 
-def summarize_news(company_name: str, news: list) -> str:
+def _news_focus(event_slug: str, client: dict | None) -> str:
+    client = client or {}
+    if event_slug == "sbc-summit-2025" or client.get("name"):
+        return """- Product launches or partnerships (if any)
+- Funding or M&A (if any)
+- Hiring or expansion signals (if any)
+- Conference/event presence (if any)
+- Gambling, iGaming, sports betting, or payments relevance (if any)"""
+    return """- Product launches or partnerships (if any)
+- Funding or M&A (if any)
+- Hiring or expansion signals (if any)
+- Conference/event presence (if any)
+- Government or security printing relevance (if any)"""
+
+
+def summarize_news(
+    company_name: str,
+    news: list,
+    *,
+    event_slug: str = "identity-week-2026",
+    client_context: dict | None = None,
+) -> str:
     if not news:
         return "No recent press found."
     print(f"    [gemini] Summarizing news for {company_name}...")
+    focus = _news_focus(event_slug, client_context)
     prompt = f"""Extract recent company signals from these news search results for {company_name}.
 
 NEWS ARTICLES:
 {json.dumps(news, indent=2)}
 
 Write plain text, max 200 words, as bullet points covering:
-- Product launches or partnerships (if any)
-- Funding or M&A (if any)
-- Hiring or expansion signals (if any)
-- Conference/event presence (if any)
-- Government or security printing relevance (if any)
+{focus}
 
 Only state facts from the articles. If nothing relevant, say "No material signals in recent press."
+Do not mention Distinkt, security pigments, passports, or anti-counterfeiting unless the articles are about those topics.
 No JSON."""
 
     summary = call_gemini(prompt, max_tokens=500).strip()

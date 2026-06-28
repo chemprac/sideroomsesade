@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from apify_client import ApifyClient
 
 from pipeline.config import APIFY_API_TOKEN, MAX_LINKEDIN_POSTS
@@ -27,7 +29,8 @@ def fetch_linkedin_posts(linkedin_url: str, company_name: str) -> list:
     try:
         print(f"    [linkedin] Scraping posts for {company_name}...")
         run = apify.actor("supreme_coder/linkedin-post").call(
-            run_input={"urls": [linkedin_url], "limitPerSource": MAX_LINKEDIN_POSTS}
+            run_input={"urls": [linkedin_url], "limitPerSource": MAX_LINKEDIN_POSTS},
+            timeout_secs=90,
         )
         items = list(apify.dataset(run["defaultDatasetId"]).iterate_items())
         posts = []
@@ -51,13 +54,22 @@ def fetch_linkedin_posts(linkedin_url: str, company_name: str) -> list:
         return []
 
 
-def summarize_linkedin(company_name: str, posts: list) -> str:
+def summarize_linkedin(
+    company_name: str,
+    posts: list,
+    *,
+    event_slug: str = "identity-week-2026",
+) -> str:
     if not posts:
         return "No LinkedIn posts available."
     print(f"    [gemini] Summarizing LinkedIn for {company_name}...")
     lines = []
     for p in posts[:10]:
         lines.append(f"- [{p.get('date') or 'unknown date'}] {p.get('text', '')[:400]}")
+    if event_slug == "sbc-summit-2025":
+        themes = "- Gambling, iGaming, sports betting, or payments themes"
+    else:
+        themes = "- Security printing / identity / authentication themes"
     prompt = f"""Extract company signals from these LinkedIn posts for {company_name}.
 
 POSTS:
@@ -68,7 +80,7 @@ Write plain text, max 200 words, as bullet points covering:
 - Events or conferences
 - Hiring or team growth
 - Partnerships or customer wins
-- Security printing / identity / authentication themes
+{themes}
 
 Only state facts from the posts. No JSON."""
 
