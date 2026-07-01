@@ -1,20 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { PipelineBoard } from "@/components/pipeline/PipelineBoard";
+import { useSearchParams } from "next/navigation";
+import { CompanyBoard } from "@/components/companies/CompanyBoard";
 import { ADMIN_AUTH_KEY, adminFetch } from "@/lib/admin-client";
-import type { OutreachLead, SourcingInitiative } from "@/lib/outreach-pipeline";
-import type { IcpFit } from "@/lib/outreach-companies";
+import type { OutreachCompany } from "@/lib/outreach-companies";
 
-export default function PipelinePage() {
+function CompaniesPageInner() {
+  const searchParams = useSearchParams();
+  const preselectedCompanyId = searchParams.get("company");
+
   const [authenticated, setAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
   const [secret, setSecret] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
-  const [leads, setLeads] = useState<OutreachLead[] | null>(null);
-  const [initiatives, setInitiatives] = useState<SourcingInitiative[]>([]);
-  const [companyIcpFit, setCompanyIcpFit] = useState<Record<string, IcpFit>>({});
+  const [companies, setCompanies] = useState<OutreachCompany[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -33,28 +34,14 @@ export default function PipelinePage() {
       setLoading(true);
       setLoadError(null);
       try {
-        const [leadsRes, companiesRes] = await Promise.all([
-          adminFetch(secret, "/api/admin/outreach-leads"),
-          adminFetch(secret, "/api/admin/outreach-companies"),
-        ]);
-        const data = await leadsRes.json();
-        if (!leadsRes.ok) throw new Error(data.error ?? "Failed to load leads");
-        if (!cancelled) {
-          setLeads(data.leads ?? []);
-          setInitiatives(data.initiatives ?? []);
-        }
-        if (companiesRes.ok) {
-          const companiesData = await companiesRes.json();
-          const icpMap: Record<string, IcpFit> = {};
-          for (const c of companiesData.companies ?? []) {
-            icpMap[c.id] = c.icp_fit;
-          }
-          if (!cancelled) setCompanyIcpFit(icpMap);
-        }
+        const res = await adminFetch(secret, "/api/admin/outreach-companies");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Failed to load companies");
+        if (!cancelled) setCompanies(data.companies ?? []);
       } catch (e) {
         if (!cancelled) {
           setLoadError(e instanceof Error ? e.message : "Failed to load");
-          setLeads(null);
+          setCompanies(null);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -86,9 +73,7 @@ export default function PipelinePage() {
     sessionStorage.removeItem(ADMIN_AUTH_KEY);
     setSecret("");
     setAuthenticated(false);
-    setLeads(null);
-    setInitiatives([]);
-    setCompanyIcpFit({});
+    setCompanies(null);
   };
 
   if (!authenticated) {
@@ -96,16 +81,16 @@ export default function PipelinePage() {
       <div className="pipeline-login page-container">
         <span className="postmark">Restricted</span>
         <h1 className="font-heading" style={{ fontSize: 28, marginTop: 16 }}>
-          Outreach Pipeline
+          Company Pipeline
         </h1>
         <p className="muted-text" style={{ marginTop: 8, marginBottom: 24 }}>
           Admin password required
         </p>
-        <label className="font-mono-label" htmlFor="pipeline-password">
+        <label className="font-mono-label" htmlFor="companies-password">
           Password
         </label>
         <input
-          id="pipeline-password"
+          id="companies-password"
           type="password"
           className="admin-field"
           value={password}
@@ -129,11 +114,11 @@ export default function PipelinePage() {
       <header className="pipeline-page-header">
         <div>
           <span className="postmark">Sideroom</span>
-          <h1 className="pipeline-page-title">Outreach Pipeline</h1>
+          <h1 className="pipeline-page-title">Company Pipeline</h1>
         </div>
         <div className="pipeline-page-actions">
-          <Link href="/admin/companies" className="pipeline-page-link">
-            Companies
+          <Link href="/admin/pipeline" className="pipeline-page-link">
+            People
           </Link>
           <Link href="/admin" className="pipeline-page-link">
             Admin
@@ -144,16 +129,23 @@ export default function PipelinePage() {
         </div>
       </header>
 
-      {loading ? <p className="pipeline-loading">Loading leads…</p> : null}
+      {loading ? <p className="pipeline-loading">Loading companies…</p> : null}
       {loadError ? <p className="pipeline-error">{loadError}</p> : null}
-      {leads ? (
-        <PipelineBoard
+      {companies ? (
+        <CompanyBoard
           secret={secret}
-          initialLeads={leads}
-          initialInitiatives={initiatives}
-          companyIcpFit={companyIcpFit}
+          initialCompanies={companies}
+          initialSelectedCompanyId={preselectedCompanyId}
         />
       ) : null}
     </div>
+  );
+}
+
+export default function CompaniesPage() {
+  return (
+    <Suspense fallback={null}>
+      <CompaniesPageInner />
+    </Suspense>
   );
 }

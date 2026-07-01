@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import {
   DndContext,
   DragOverlay,
@@ -16,79 +17,49 @@ import { CSS } from "@dnd-kit/utilities";
 import { adminFetch } from "@/lib/admin-client";
 import {
   BOARD_STAGES,
-  CHANNEL_COLORS,
   CHANNEL_LABELS,
-  formatActionDate,
   isArchivedStage,
   isBoardStage,
   isOverdueLead,
   leadActivityTimestamp,
   OUTREACH_CHANNELS,
   STAGE_LABELS,
-  todayDateString,
   type BoardStage,
   type OutreachChannel,
   type OutreachLead,
   type SourcingInitiative,
 } from "@/lib/outreach-pipeline";
+import type { IcpFit } from "@/lib/outreach-companies";
 import { PipelineLeadPanel } from "@/components/pipeline/PipelineLeadPanel";
 
 type PipelineBoardProps = {
   secret: string;
   initialLeads: OutreachLead[];
   initialInitiatives: SourcingInitiative[];
+  companyIcpFit?: Record<string, IcpFit>;
 };
 
 type ChannelFilter = OutreachChannel | "all";
 type InitiativeFilter = "all" | string;
+type CompanyFilter = "all" | string;
 
-function ActionStatus({ lead }: { lead: OutreachLead }) {
-  const today = todayDateString();
-  if (!lead.next_action_date) {
-    return <span className="pipeline-card-action pipeline-card-action--unset">No next action set</span>;
-  }
-  if (isOverdueLead(lead)) {
-    return <span className="pipeline-card-action pipeline-card-action--overdue">Overdue</span>;
-  }
-  if (lead.next_action_date > today) {
-    return (
-      <span className="pipeline-card-action pipeline-card-action--future">
-        Next: {formatActionDate(lead.next_action_date)}
-      </span>
-    );
-  }
-  return <span className="pipeline-card-action pipeline-card-action--today">Due today</span>;
-}
+const ICP_ACCENT_COLORS: Partial<Record<IcpFit, string>> = {
+  core: "#D4831A",
+  adjacent: "#C8BEA4",
+};
 
-function ChannelDot({ channel }: { channel: OutreachLead["channel"] }) {
-  if (!channel) return <span className="pipeline-card-channel pipeline-card-channel--unset">No channel</span>;
-  return (
-    <span className="pipeline-card-channel" title={CHANNEL_LABELS[channel]}>
-      <span
-        className="pipeline-card-channel-dot"
-        style={{ background: CHANNEL_COLORS[channel] }}
-      />
-      {CHANNEL_LABELS[channel]}
-    </span>
-  );
-}
-
-function InitiativePill({ initiative }: { initiative: OutreachLead["initiative"] }) {
-  if (!initiative) {
-    return <span className="pipeline-card-initiative pipeline-card-initiative--unset">No initiative</span>;
-  }
-  return (
-    <span className="pipeline-card-initiative" title={initiative.name}>
-      {initiative.name}
-    </span>
-  );
+function icpAccentColor(fit: IcpFit | undefined): string {
+  if (!fit) return "transparent";
+  return ICP_ACCENT_COLORS[fit] ?? "transparent";
 }
 
 function PipelineCard({
   lead,
+  icpFit,
   onOpen,
 }: {
   lead: OutreachLead;
+  icpFit: IcpFit | undefined;
   onOpen: (lead: OutreachLead) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -96,9 +67,13 @@ function PipelineCard({
     data: { lead },
   });
 
-  const style = transform
-    ? { transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.4 : 1 }
-    : undefined;
+  const style = {
+    ...(transform
+      ? { transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.4 : 1 }
+      : {}),
+    borderLeftWidth: 2,
+    borderLeftColor: icpAccentColor(icpFit),
+  };
 
   return (
     <div
@@ -114,16 +89,28 @@ function PipelineCard({
       role="button"
       tabIndex={0}
     >
-      <div className="pipeline-card-name">{lead.name}</div>
-      <div className="pipeline-card-meta">
-        {lead.title ?? "—"}
-        {lead.company ? ` · ${lead.company}` : ""}
+      <div className="pipeline-card-top">
+        <span className="pipeline-card-name">{lead.name}</span>
+        {isOverdueLead(lead) ? (
+          <span className="pipeline-card-overdue-icon" title="Overdue">
+            !
+          </span>
+        ) : null}
       </div>
-      <InitiativePill initiative={lead.initiative} />
-      <div className="pipeline-card-footer">
-        <ChannelDot channel={lead.channel} />
-        <ActionStatus lead={lead} />
-      </div>
+      <div className="pipeline-card-title">{lead.title ?? "—"}</div>
+      {lead.company ? (
+        lead.company_id ? (
+          <Link
+            href={`/admin/companies?company=${lead.company_id}`}
+            className="pipeline-card-company"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {lead.company}
+          </Link>
+        ) : (
+          <div className="pipeline-card-company">{lead.company}</div>
+        )
+      ) : null}
     </div>
   );
 }
@@ -131,10 +118,12 @@ function PipelineCard({
 function PipelineColumn({
   stage,
   leads,
+  companyIcpFit,
   onOpen,
 }: {
   stage: BoardStage;
   leads: OutreachLead[];
+  companyIcpFit: Record<string, IcpFit>;
   onOpen: (lead: OutreachLead) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage });
@@ -142,12 +131,18 @@ function PipelineColumn({
   return (
     <div className={`pipeline-column ${isOver ? "is-over" : ""}`}>
       <div className="pipeline-column-header">
-        <span className="pipeline-column-title">{STAGE_LABELS[stage]}</span>
+        <span className="pipeline-column-title">{STAGE_LABELS[stage].toUpperCase()}</span>
+        <span className="pipeline-column-dot">·</span>
         <span className="pipeline-column-count">{leads.length}</span>
       </div>
       <div ref={setNodeRef} className="pipeline-column-body">
         {leads.map((lead) => (
-          <PipelineCard key={lead.id} lead={lead} onOpen={onOpen} />
+          <PipelineCard
+            key={lead.id}
+            lead={lead}
+            icpFit={lead.company_id ? companyIcpFit[lead.company_id] : undefined}
+            onOpen={onOpen}
+          />
         ))}
       </div>
     </div>
@@ -158,6 +153,7 @@ export function PipelineBoard({
   secret,
   initialLeads,
   initialInitiatives,
+  companyIcpFit = {},
 }: PipelineBoardProps) {
   const [leads, setLeads] = useState(initialLeads);
   const [initiatives] = useState(initialInitiatives);
@@ -165,6 +161,7 @@ export function PipelineBoard({
   const [selectedLead, setSelectedLead] = useState<OutreachLead | null>(null);
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>("all");
   const [initiativeFilter, setInitiativeFilter] = useState<InitiativeFilter>("all");
+  const [companyFilter, setCompanyFilter] = useState<CompanyFilter>("all");
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -172,16 +169,25 @@ export function PipelineBoard({
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   );
 
+  const companyOptions = useMemo(() => {
+    const names = new Set<string>();
+    for (const lead of leads) {
+      if (lead.company && !isArchivedStage(lead.stage)) names.add(lead.company);
+    }
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [leads]);
+
   const filteredLeads = useMemo(() => {
     return leads.filter((lead) => {
       if (channelFilter !== "all" && lead.channel !== channelFilter) return false;
       if (initiativeFilter !== "all" && lead.initiative_id !== initiativeFilter) {
         return false;
       }
+      if (companyFilter !== "all" && lead.company !== companyFilter) return false;
       if (overdueOnly && !isOverdueLead(lead)) return false;
       return true;
     });
-  }, [leads, channelFilter, initiativeFilter, overdueOnly]);
+  }, [leads, channelFilter, initiativeFilter, companyFilter, overdueOnly]);
 
   const statsLeads = useMemo(() => {
     if (initiativeFilter === "all") return leads;
@@ -345,6 +351,26 @@ export function PipelineBoard({
         </label>
       </div>
 
+      <div className="pipeline-company-filter-row">
+        <button
+          type="button"
+          className={`pipeline-company-pill ${companyFilter === "all" ? "is-active" : ""}`}
+          onClick={() => setCompanyFilter("all")}
+        >
+          All Companies
+        </button>
+        {companyOptions.map((company) => (
+          <button
+            key={company}
+            type="button"
+            className={`pipeline-company-pill ${companyFilter === company ? "is-active" : ""}`}
+            onClick={() => setCompanyFilter(company)}
+          >
+            {company}
+          </button>
+        ))}
+      </div>
+
       {error ? <p className="pipeline-error">{error}</p> : null}
 
       <DndContext
@@ -358,6 +384,7 @@ export function PipelineBoard({
               key={stage}
               stage={stage}
               leads={leadsByStage[stage]}
+              companyIcpFit={companyIcpFit}
               onOpen={setSelectedLead}
             />
           ))}
@@ -365,11 +392,13 @@ export function PipelineBoard({
         <DragOverlay>
           {activeLead ? (
             <div className="pipeline-card pipeline-card--overlay">
-              <div className="pipeline-card-name">{activeLead.name}</div>
-              <div className="pipeline-card-meta">
-                {activeLead.title ?? "—"}
-                {activeLead.company ? ` · ${activeLead.company}` : ""}
+              <div className="pipeline-card-top">
+                <span className="pipeline-card-name">{activeLead.name}</span>
               </div>
+              <div className="pipeline-card-title">{activeLead.title ?? "—"}</div>
+              {activeLead.company ? (
+                <div className="pipeline-card-company">{activeLead.company}</div>
+              ) : null}
             </div>
           ) : null}
         </DragOverlay>

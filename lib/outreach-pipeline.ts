@@ -89,9 +89,10 @@ export type SourcingInitiative = {
 };
 
 export const OUTREACH_LEAD_SELECT = `
-  id, name, title, company, linkedin_url, score, tier, stage, channel,
+  id, name, title, company, company_id, linkedin_url, score, tier, stage, channel,
   initiative_id, next_action_date, next_action_note, created_at,
-  outreach_status, sent_at, connection_accepted_at, replied_at, follow_up_sent_at, reply_text,
+  outreach_status, sent_at, connection_accepted_at, replied_at, follow_up_sent_at,
+  follow_up_message, reply_text,
   sourcing_initiatives (
     id, name, method, description, source_url, started_at
   )
@@ -102,6 +103,7 @@ export type OutreachLead = {
   name: string;
   title: string | null;
   company: string | null;
+  company_id: string | null;
   linkedin_url: string;
   score: number | null;
   tier: string | null;
@@ -117,6 +119,7 @@ export type OutreachLead = {
   connection_accepted_at: string | null;
   replied_at: string | null;
   follow_up_sent_at: string | null;
+  follow_up_message: string | null;
   reply_text: string | null;
 };
 
@@ -148,6 +151,7 @@ export function mapLeadRow(row: Record<string, unknown>): OutreachLead {
     name: row.name as string,
     title: (row.title as string | null) ?? null,
     company: (row.company as string | null) ?? null,
+    company_id: (row.company_id as string | null) ?? null,
     linkedin_url: row.linkedin_url as string,
     score: typeof row.score === "number" ? row.score : null,
     tier: (row.tier as string | null) ?? null,
@@ -163,6 +167,7 @@ export function mapLeadRow(row: Record<string, unknown>): OutreachLead {
     connection_accepted_at: (row.connection_accepted_at as string | null) ?? null,
     replied_at: (row.replied_at as string | null) ?? null,
     follow_up_sent_at: (row.follow_up_sent_at as string | null) ?? null,
+    follow_up_message: (row.follow_up_message as string | null) ?? null,
     reply_text: (row.reply_text as string | null) ?? null,
   };
 }
